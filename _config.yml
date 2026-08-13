@@ -1,0 +1,27 @@
+# GitHub Pages builds this repository into a small site. Jekyll's readme-index
+# plugin is on by default here, so README.md becomes the front page with no
+# index file to maintain, and the hand-written pages under docs/ are copied
+# through untouched and served at /docs/.
+#
+# Nothing else belongs on a website, which is what the exclude list is for: the
+# source is worth reading on GitHub, where it is syntax-highlighted and
+# linkable by line, and not worth serving as raw files from a second address.
+# Links in the README that point at excluded files are written as full GitHub
+# URLs for that reason — they resolve the same whether the reader is on the
+# repository page or the site.
+title: Deckhand
+description: A touch panel for Windows that never takes focus.
+theme: jekyll-theme-cayman
+
+exclude:
+  - Config/
+  - Interop/
+  - Panel/
+  - Remote/
+  - "*.cs"
+  - "*.xaml"
+  - "*.csproj"
+  - "*.sln"
+  - "*.manifest"
+  - "*.ps1"
+  - "*.ico"

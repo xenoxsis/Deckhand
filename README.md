@@ -792,7 +792,7 @@ A worker only exists on a secure page, so over plain `http` to the laptop there 
 The page checks and carries on without it: no offline shell, and the update comes from the
 snapshot fingerprint alone, which is the part that matters.
 
-**The icon** is drawn by [`icon.ps1`](icon.ps1) — a dark panel of four tiles with one of
+**The icon** is drawn by [`icon.ps1`](https://github.com/xenoxsis/Deckhand/blob/main/icon.ps1) — a dark panel of four tiles with one of
 them lit, which is what the panel looks like from across a desk. One script draws every
 size, including `icon.ico` for the exe, so the taskbar, Explorer, an iPad's home screen and
 an Android launcher all show the same thing. The tile colours are lightened from the
@@ -1193,7 +1193,8 @@ the keystrokes to itself.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Do what you like with it; keep the copyright notice.
+MIT — see [LICENSE](https://github.com/xenoxsis/Deckhand/blob/main/LICENSE). Do what
+you like with it; keep the copyright notice.
 
 The one dependency, [QRCoder](https://github.com/codebude/QRCoder), is MIT too. If
 you redistribute a built copy rather than the source, put its license file in the
