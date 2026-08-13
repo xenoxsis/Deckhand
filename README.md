@@ -4,10 +4,33 @@ An always-on-top, touch-friendly WPF panel that **never takes focus**. Tap a
 tile to launch an app or insert a text snippet into whatever window is focused
 (VSCode, a browser, anything).
 
-**Setting one up?** Open [`docs/index.html`](docs/index.html) in a browser — a small
-documentation site covering how to run and configure the panel, with a worked example
-of every configuration key and five complete config files to copy. This README is the
-design document behind it: why each decision went the way it did, and what was tested.
+**Setting one up?** The [documentation site][docs] covers how to run and configure the
+panel, with a worked example of every configuration key and five complete config files
+to copy. This README is the design document behind it: why each decision went the way
+it did, and what was tested.
+
+[Getting started][docs] · [Configuration reference][config] · [Example configs][examples] · [Tablet remote][tablet]
+
+[docs]: https://xenoxsis.github.io/Deckhand/docs/
+[config]: https://xenoxsis.github.io/Deckhand/docs/configuration.html
+[examples]: https://xenoxsis.github.io/Deckhand/docs/examples.html
+[tablet]: https://xenoxsis.github.io/Deckhand/docs/tablet.html
+
+## Contents
+
+- [Run](#run)
+- [Where the code lives](#where-the-code-lives)
+- [Where the panel runs](#where-the-panel-runs)
+- [Elevation](#elevation)
+- [Configure](#configure)
+- [URL tiles and the "respective browser"](#url-tiles-and-the-respective-browser)
+- [The panel on a tablet](#the-panel-on-a-tablet)
+- [Resizing](#resizing)
+- [Unlocking, and FancyZones](#unlocking-and-fancyzones)
+- [How the no-focus trick works](#how-the-no-focus-trick-works)
+- [The example Work Items section, key by key](#the-example-work-items-section-key-by-key)
+- [Known limitations](#known-limitations)
+- [License](#license)
 
 ## Run
 
