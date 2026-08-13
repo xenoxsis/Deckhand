@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deckhand — documentation</title>
+<meta name="description" content="How to run and configure Deckhand, a touch panel for Windows that never takes focus.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+
+<nav class="side" aria-label="Documentation">
+  <a class="brand" href="index.html"><span class="brand-mark">&#9698;</span>Deckhand <span class="brand-sub">docs</span></a>
+  <ul class="nav">
+    <li><a href="index.html" aria-current="page">Getting started</a></li>
+    <li><a href="configuration.html">Configuration reference</a></li>
+    <li><a href="examples.html">Example configs</a></li>
+    <li><a href="tablet.html">Tablet remote</a></li>
+  </ul>
+  <p class="nav-label">On this page</p>
+  <ul class="nav toc" id="toc"></ul>
+  <button class="theme" id="theme" type="button">&#9689; Theme</button>
+</nav>
+
+<main id="main">
+<div class="wrap">
+
+<h1>Deckhand</h1>
+<p class="lede">A touch panel for Windows that sits on top of your work and
+<strong>never takes focus</strong>. Tap a tile to launch an app, raise a window it already
+has, or type a snippet into whatever you were just working in — the panel never becomes
+the active window, so the caret stays exactly where you left it.</p>
+
+<div class="cards">
+  <a class="card" href="configuration.html">
+    <h3>Configuration reference &rarr;</h3>
+    <p>Every key in <code>dashboard.json</code>, what it defaults to, and an example of each.</p>
+  </a>
+  <a class="card" href="examples.html">
+    <h3>Example configs &rarr;</h3>
+    <p>Five complete files to copy: a starter, a writer's desk, a developer's, a support desk, a folder launcher.</p>
+  </a>
+  <a class="card" href="tablet.html">
+    <h3>Tablet remote &rarr;</h3>
+    <p>Serve the same panel to a tablet's browser over your own network, and what keeps that safe.</p>
+  </a>
+</div>
+
+<h2 id="what">What it is</h2>
+
+<p>The panel is a grid of <strong>tiles</strong> grouped into <strong>sections</strong>. A
+tile is one of three things:</p>
+
+<ul>
+  <li><strong>An app tile</strong> — one control split by a line. The wide side goes to a
+    window the program already has (asking which, when there is more than one); the narrow
+    <code>+</code> starts another copy. A folder opens in Explorer; an <code>http(s)</code>
+    address opens as a tab in the browser you are already looking at.</li>
+  <li><strong>A snippet tile</strong> — text dropped at the caret of whatever window is
+    focused, either pasted or typed character by character, optionally followed by
+    <code>Tab</code>, <code>Enter</code> or <code>Escape</code>.</li>
+  <li><strong>A folder tile</strong> — one per subdirectory of a folder you name, generated
+    at load. Tapping one either opens that folder or types a command template naming it.</li>
+</ul>
+
+<p>Sections can be tied to <strong>profiles</strong> — names for the app in front. A section
+written for your editor is on screen while the editor is focused and gone otherwise, so the
+panel changes as you move between windows without anything to switch by hand.</p>
+
+<h2 id="run">Running it</h2>
+
+<p>The app requires administrator, which is why <code>dotnet run</code> fails with
+<em>"The requested operation requires elevation"</em>. Build it, then start the exe:</p>
+
+<figure class="code">
+<figcaption>PowerShell</figcaption>
+<pre><code class="lang-shell">dotnet build Deckhand.csproj
+Start-Process bin\Debug\net9.0-windows\Deckhand.exe</code></pre>
+</figure>
+
+<p>Double-clicking the exe works the same way. Either route puts a UAC prompt in front of
+you first.</p>
+
+<div class="note">
+  <span class="note-title">Why administrator</span>
+  <p>Windows refuses synthesized keystrokes aimed at a window running at a higher integrity
+  level than the sender. Without elevation the panel works everywhere except the elevated
+  windows — where it silently does nothing, which is the worst of the options. Elevated, its
+  keystrokes reach everything. The cost is that anything it launches would inherit
+  administrator, so tiles de-elevate what they start by default (see
+  <a href="configuration.html#app-deelevate"><code>deElevate</code></a>).</p>
+</div>
+
+<h3 id="modes">Local or tablet</h3>
+
+<p>If <code>remote.enabled</code> is on, startup asks where the panel should be:
+<strong>on this laptop</strong> (the panel itself) or <strong>on a tablet</strong> (a small
+status window here, the panel served to the tablet's browser). With
+<code>remote.enabled: false</code> the question isn't asked and nothing ever listens on the
+network.</p>
+
+<p>Command-line switches answer it in advance, which is what a pinned shortcut wants — and
+a switch beats the config file:</p>
+
+<figure class="code">
+<figcaption>PowerShell</figcaption>
+<pre><code class="lang-shell">Deckhand.exe --local     # the panel on this screen, nothing listening
+Deckhand.exe --remote    # serve to a tablet, even if enabled is false
+Deckhand.exe --check     # validate the config and exit, without starting anything</code></pre>
+</figure>
+
+<h3 id="panel-buttons">The panel's own buttons</h3>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td><code>&#128274;</code></td><td>Unlock, so the panel can be moved, resized or snapped. Locked is the normal state: a locked panel can't be dragged out of place by a stray finger.</td></tr>
+    <tr><td><code>&#8635;</code></td><td>Re-read the config and rescan folder sections. Saving the file does this on its own — this is the manual, louder version, which also reports config problems in a dialog.</td></tr>
+    <tr><td><code>&#9143;</code></td><td>Fill this screen, and back again.</td></tr>
+    <tr><td><code>&#10005;</code></td><td>Shut the dashboard down. (In tablet mode the status window's <code>&#10005;</code> only hides it to the notification area — the panel keeps serving.)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>The strip at the top left names the app the panel currently thinks is in front, which is
+also the answer to "why am I not seeing the section I wrote".</p>
+
+<h2 id="first-config">Your first config</h2>
+
+<p>Configuration is one JSON file, <code>dashboard.json</code>, next to the exe — or, in a
+source checkout, the one beside <code>Deckhand.csproj</code>. The <code>&#8635;</code>
+tooltip names the exact file it read.</p>
+
+<p>This is enough to be useful. Two always-visible sections, using the
+<code>apps</code> and <code>snippets</code> shorthand, which each become one section without
+any grid placement to think about:</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "apps": [
+    { "label": "Files",   "path": "C:/Users/Public/Documents" },
+    { "label": "Notepad", "path": "notepad" },
+    { "label": "Intranet", "path": "https://example.internal/home" }
+  ],
+
+  "snippets": [
+    { "label": "Today",   "text": "{date}" },
+    { "label": "Sign-off", "text": "Kind regards,\nSam" }
+  ]
+}</code></pre>
+</figure>
+
+<p>Save it. The panel reloads itself about half a second later — no restart, no rebuild, not
+even a tap. From there, the things worth reaching for next are
+<a href="configuration.html#sections">sections</a> (to place groups on the grid) and
+<a href="configuration.html#profiles">profiles</a> (to make a group follow an app).</p>
+
+<div class="note">
+  <span class="note-title">Comments are allowed</span>
+  <p>The loader skips <code>//</code> comments and trailing commas, so you can annotate the
+  file even though strict JSON forbids both. Pointing <code>"$schema"</code> at the shipped
+  <code>dashboard.schema.json</code> gives editors like VS Code completion for every key and
+  a squiggle under typos.</p>
+</div>
+
+<h2 id="two-files">Two files: shared and local</h2>
+
+<p>If a <code>dashboard.local.json</code> sits beside <code>dashboard.json</code>, it is
+merged over it at load. Keys in the local file win, objects merge a level at a time, and a
+list or a plain value replaces the shared one outright — half a list from each file would be
+impossible to reason about.</p>
+
+<p>The point of the split is that one file travels and one doesn't. Anything with a machine
+in it — a path with your user name, whether <em>this</em> machine serves to a tablet — goes
+in the local file, and the shared file stays portable:</p>
+
+<figure class="code">
+<figcaption>dashboard.local.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  // This machine serves to a tablet; the shared file ships with it off.
+  "remote": { "enabled": true }
+}</code></pre>
+</figure>
+
+<p>A local file that won't parse costs only itself: the shared file still loads and a warning
+says what was dropped. When both were read, the <code>&#8635;</code> tooltip names both.</p>
+
+<h2 id="mistakes">When something doesn't appear</h2>
+
+<p>Most config mistakes are silent by nature — a misspelled key is a key the deserializer
+skips, and a tile that never appears looks exactly like a tile you didn't write. So the
+dashboard reads the file a second time against its own model and says what it didn't
+recognise. Those warnings arrive in a dialog on <code>&#8635;</code>, in the log, and from
+<code>--check</code>:</p>
+
+<figure class="code">
+<figcaption>PowerShell</figcaption>
+<pre><code class="lang-shell">Deckhand.exe --check</code></pre>
+</figure>
+
+<p>It prints to the console it was started from (or a message box when there isn't one) and
+exits <code>0</code> when clean, <code>1</code> when the report has anything in it — so a
+script can gate on it. What it catches:</p>
+
+<ul>
+  <li>Keys the dashboard doesn't know, named with their path (<code>"snipets"</code>,
+    <code>layout.colums</code>).</li>
+  <li>A section written for a profile label that no profile has — its tiles could never
+    appear.</li>
+  <li>A profile that can never be reached, because one above it already claims that process
+    unconditionally.</li>
+  <li>A <code>columns</code>/<code>rows</code> range that isn't a number or
+    <code>"1-3"</code>; the section is packed instead of pinned.</li>
+  <li>A <code>titleMatch</code> or <code>split</code> that isn't a valid regex.</li>
+  <li>A tile <code>color</code> that isn't <code>#RGB</code> or <code>#RRGGBB</code>.</li>
+  <li>A <code>source</code> with no <code>folders</code> to scan.</li>
+</ul>
+
+<p>Two things that are <em>not</em> mistakes and won't be reported: a section written for
+profiles is invisible until one of them is focused, and a pinned section that overlaps
+another is left exactly where you pinned it. If a group seems to have a scrollbar it has no
+need for, compare its rectangle with its neighbours' before anything else.</p>
+
+<div class="pager">
+  <span></span>
+  <a class="next" href="configuration.html">
+    <span>Next</span>
+    <strong>Configuration reference &rarr;</strong>
+  </a>
+</div>
+
+<footer>
+  <p>Deckhand &middot; these pages cover the config format and the panel's behaviour.
+  The project <a href="../README.md">README</a> is the design document behind them — why each
+  decision went the way it did, and what was tested.</p>
+  <p>MIT licensed &middot; <a href="../LICENSE">LICENSE</a></p>
+</footer>
+
+</div>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

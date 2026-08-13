@@ -1,0 +1,50 @@
+# Build output. Both come back from `dotnet build`, and there is a second reason for
+# bin/: the build copies dashboard.json next to the exe, so an ignored config would
+# be published anyway through the build output if this line weren't here.
+bin/
+obj/
+
+# Visual Studio's per-user state — window layout, the .suo, and the Copilot index,
+# which is a database built from the source rather than the source. None of it means
+# anything on another machine, and it is by far the largest thing in the folder.
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# The other editors, on the same grounds.
+.idea/
+.vscode/
+*.swp
+*~
+
+# Claude Code's per-machine settings (the launch config beside it is checked in on
+# purpose — it is how the docs get served, and it holds nothing personal).
+.claude/settings.local.json
+
+# The live configuration, and the machine-specific half that is merged over it. A
+# config is the list of paths on this machine, the URLs of the things it opens and
+# the text it types into other windows; that is nobody else's business, and on some
+# machines it includes credentials, since a snippet is just text and typing a
+# password is exactly what a snippet is good at. dashboard.example.json is the copy
+# that is published — start from that, and see "Your own config" in the README.
+#
+# dashboard.schema.json is *not* ignored: it describes the format rather than
+# holding any of it, and both files point at it.
+dashboard.json
+dashboard.local.json
+
+# The remote's token, if anyone ever points remote.tokenFile at the project rather
+# than leaving it in %USERPROFILE%. Its holder types and launches things as
+# administrator, so it gets a line here even though it belongs somewhere else.
+.deckhand_token
+*.token
+
+# NuGet, when restored into the folder rather than the global cache.
+packages/
+*.nupkg
+
+# Publish output.
+publish/
+*.publishsettings

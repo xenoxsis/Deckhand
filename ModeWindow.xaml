@@ -1,0 +1,50 @@
+<!--
+    The startup question. An ordinary window on purpose — it's the one part of this app
+    that is meant to be clicked into, and it's gone before the panel exists, so none of
+    the never-take-focus machinery applies to it.
+-->
+<Window x:Class="Deckhand.ModeWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deckhand"
+        Width="480" SizeToContent="Height"
+        ResizeMode="NoResize" ShowInTaskbar="True" Topmost="True"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E" Foreground="#EAEAEA"
+        FontFamily="Segoe UI" FontSize="14"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <StackPanel Margin="18,14,18,18">
+
+        <TextBlock Text="Where do you want the panel?" FontSize="17" Margin="4,0,4,4"/>
+        <TextBlock Foreground="#8A8A8A" FontSize="12" TextWrapping="Wrap" Margin="4,0,4,14"
+                   Text="Either way the tiles type and launch things here, on this machine."/>
+
+        <Button Style="{StaticResource TileButton}" Height="86" Click="Local_Click">
+            <StackPanel>
+                <TextBlock Text="On this laptop" FontSize="17" TextAlignment="Center"/>
+                <TextBlock Foreground="#8A8A8A" FontSize="12" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="The panel on top of your work, following whatever you focus and never taking focus itself."/>
+            </StackPanel>
+        </Button>
+
+        <Button x:Name="RemoteButton" Style="{StaticResource TileButton}" Height="86"
+                Click="Remote_Click">
+            <StackPanel>
+                <TextBlock Text="On a tablet" FontSize="17" TextAlignment="Center"/>
+                <TextBlock Foreground="#8A8A8A" FontSize="12" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="Nothing on this screen but a small window with the address. The panel opens in the tablet's browser."/>
+            </StackPanel>
+        </Button>
+
+        <!-- Filled in when remote can't run, instead of a button that leads nowhere. -->
+        <TextBlock x:Name="RemoteNote" Foreground="#F0D68A" FontSize="12"
+                   TextWrapping="Wrap" Margin="6,6,6,0" Visibility="Collapsed"/>
+
+        <TextBlock Foreground="#6A6A70" FontSize="11" TextWrapping="Wrap" Margin="6,16,6,0"
+                   Text="Start with --local or --remote to skip this question."/>
+
+    </StackPanel>
+</Window>

@@ -1,0 +1,173 @@
+<!--
+    Remote mode's only window. Deliberately ordinary — movable, resizable, in the
+    taskbar — because it isn't the control surface; the tablet is. All it has to do is
+    say where to reach the panel and whether the tablet is getting through.
+
+    ✕ is the exception to ordinary: it hides this window to the notification area rather
+    than closing it, where the same status is in the tooltip and ↻ and Quit are behind a
+    right-click. The panel goes on serving the tablet either way, so stopping it is Quit's
+    job, not the job of the button that puts a window away. See the tray section of
+    RemoteWindow.xaml.cs.
+
+    ShowActivated is false so appearing doesn't steal focus from whatever was being
+    worked in: while this window has focus the dashboard refuses taps (a snippet would
+    be typed into it), and starting up in that state would make the first tap from the
+    tablet fail for no reason the user could see.
+-->
+<Window x:Class="Deckhand.RemoteWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deckhand — remote"
+        Width="520" Height="620" MinWidth="380" MinHeight="420"
+        ShowActivated="False" ShowInTaskbar="True"
+        WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E" Foreground="#EAEAEA"
+        FontFamily="Segoe UI" FontSize="14">
+
+    <Grid Margin="16,12,16,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- addresses -->
+            <RowDefinition Height="Auto"/>   <!-- token -->
+            <RowDefinition Height="Auto"/>   <!-- status -->
+            <RowDefinition Height="*"/>      <!-- the log, taking the rest -->
+            <RowDefinition Height="Auto"/>   <!-- buttons -->
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="OPEN THIS ON THE TABLET" Foreground="#8A8A8A" FontSize="11"
+                           FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <!-- Read-only text boxes rather than labels, so an address can be selected
+                     and copied without a button for it. -->
+                <ItemsControl x:Name="AddressList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <!-- OneWay explicitly: TextBox.Text binds two-way by default, and
+                                 a two-way binding needs a path to write back through — the
+                                 item here is the string itself. -->
+                            <TextBox Text="{Binding Mode=OneWay}" IsReadOnly="True" IsReadOnlyCaretVisible="True"
+                                     BorderThickness="0" Padding="0,1"
+                                     Background="Transparent" Foreground="#EAEAEA"
+                                     FontFamily="Consolas" FontSize="15"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="AddressNote" Foreground="#6A6A70" FontSize="11"
+                           TextWrapping="Wrap" Margin="0,4,0,0"/>
+            </StackPanel>
+
+            <!-- The first address as a QR, so setup is a scan rather than typing an IP on
+                 a tablet keyboard. White on purpose: scanners want a light background, and
+                 the padding is the quiet zone. NearestNeighbor keeps the modules square
+                 when the 1px-per-module bitmap is scaled up. Its tooltip explains the one
+                 subtlety — the token rides along only while Show has it revealed. -->
+            <Border x:Name="QrBox" Grid.Column="1" Background="White" CornerRadius="6"
+                    Padding="8" Margin="14,2,0,0" VerticalAlignment="Top"
+                    Visibility="Collapsed">
+                <Image x:Name="QrImage" Width="112" Height="112"
+                       RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="TOKEN" Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"/>
+                <TextBlock x:Name="TokenText" FontFamily="Consolas" FontSize="15"
+                           TextTrimming="CharacterEllipsis"/>
+            </StackPanel>
+
+            <!-- Words rather than glyphs: ⧉ and 👁 are not in every font at every size,
+                 and a tofu box on the only button that reveals a secret is not the place
+                 to find that out. -->
+            <Button x:Name="ShowTokenButton" Grid.Column="1" Content="Show"
+                    ToolTip="Show the token on this screen"
+                    Style="{StaticResource ToolButton}" Width="56" FontSize="12"
+                    Click="ShowToken_Click"/>
+            <Button Grid.Column="2" Content="Copy" ToolTip="Copy the token to the clipboard"
+                    Style="{StaticResource ToolButton}" Width="56" FontSize="12"
+                    Click="CopyToken_Click"/>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,18,0,0">
+            <Border Height="1" Background="#3F3F46" Margin="0,0,0,12"/>
+
+            <StackPanel Orientation="Horizontal">
+                <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="#8A8A8A"
+                         VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock x:Name="StatusText" Text="starting…" VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock x:Name="DetailText" Foreground="#8A8A8A" FontSize="12"
+                       TextWrapping="Wrap" Margin="17,4,0,0"/>
+            <TextBlock x:Name="WarningText" Foreground="#F0D68A" FontSize="12"
+                       TextWrapping="Wrap" Margin="17,6,0,0" Visibility="Collapsed"/>
+        </StackPanel>
+
+        <!--
+            Everything that passed between the two sides. In this mode the panel isn't on
+            screen, so a tap that appears to do nothing has nowhere else to be explained.
+        -->
+        <Grid Grid.Row="3" Margin="0,16,0,12">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <DockPanel Grid.Row="0" Margin="0,0,0,6">
+                <Button DockPanel.Dock="Right" Content="Copy" ToolTip="Copy the whole log"
+                        Style="{StaticResource ToolButton}" Width="56"
+                        FontSize="12" Click="CopyLog_Click"/>
+                <TextBlock Text="LOG" Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+
+            <Border Grid.Row="1" Background="#171717" BorderBrush="#3F3F46"
+                    BorderThickness="1" CornerRadius="6">
+                <ScrollViewer x:Name="LogScroll" Padding="8,6"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled"
+                              PanningMode="VerticalOnly">
+                    <StackPanel x:Name="LogLines"/>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <Grid Grid.Row="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0" Foreground="#6A6A70" FontSize="11" TextWrapping="Wrap"
+                       VerticalAlignment="Center" Margin="0,0,10,0"
+                       Text="The panel isn't drawn here. It still follows whichever app you focus, and a tap on the tablet acts on this machine."/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <!-- The half of ↻ people actually reach for when swapping tablets: let
+                     the session go without also re-reading the config. -->
+                <Button Content="Unpair" Style="{StaticResource TileButton}"
+                        ToolTip="Let go of the paired device, so another one with the right token can take the session."
+                        MinWidth="86" MinHeight="42" FontSize="14" Click="Unpair_Click"/>
+                <Button Content="↻ Reload" Style="{StaticResource TileButton}"
+                        MinWidth="104" MinHeight="42" FontSize="14" Click="Reload_Click"/>
+                <!-- Spelled out because the two are no longer the same button: this stops
+                     the dashboard, where ✕ leaves it running in the notification area. -->
+                <Button Content="Quit" Style="{StaticResource TileButton}"
+                        ToolTip="Stop the dashboard. ✕ only hides this window."
+                        MinWidth="86" MinHeight="42" FontSize="14" Click="Quit_Click"/>
+            </StackPanel>
+        </Grid>
+
+    </Grid>
+</Window>

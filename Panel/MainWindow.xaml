@@ -1,0 +1,140 @@
+<!--
+    Width/Height below are only the first-run size: after that the panel comes up at
+    whatever size the corner grip was last dragged to (see PanelSize.cs).
+
+    ResizeMode stays NoResize on purpose. Windows' own resize loop starts from a
+    non-client hit and would put this window a step away from being activated, which
+    is the one thing it must never be — so the grip does the resizing by hand in
+    MainWindow.xaml.cs, by polling the cursor. Mouse capture is no use here either:
+    only the foreground window may capture, and this one is never foreground.
+-->
+<Window x:Class="Deckhand.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deckhand"
+        Width="880" Height="620" MinWidth="320" MinHeight="240"
+        WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        Topmost="True"
+        ShowActivated="False" Focusable="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual">
+
+    <Border x:Name="RootBorder" Background="#1E1E1E" BorderBrush="#3F3F46"
+            BorderThickness="1" CornerRadius="12">
+      <Grid>
+        <DockPanel Margin="8">
+
+            <!-- Top bar: drag handle on the left, controls on the right -->
+            <Grid DockPanel.Dock="Top" Height="40"
+                  Background="Transparent"
+                  MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <!-- Text and Margin are set from the lock state; see ApplyLockChrome. -->
+                <TextBlock x:Name="ContextLabel" Text="Deckhand"
+                           Foreground="#8A8A8A" FontSize="13" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" Margin="8,0,156,0"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                            VerticalAlignment="Center">
+                    <!-- Turns the panel into an ordinary window so it can be moved,
+                         resized and snapped, then back again. Content/tooltip are
+                         swapped in code to show which state it's in. -->
+                    <Button x:Name="LockButton" Content="🔒"
+                            ToolTip="Unlock: move, resize or snap the panel"
+                            Style="{StaticResource ToolButton}"
+                            Click="ToggleLock_Click"/>
+                    <!-- Tooltip is filled in from the config, so it names the exact
+                         file that will be re-read. -->
+                    <Button x:Name="ReloadButton" Content="↻"
+                            Style="{StaticResource ToolButton}"
+                            Click="Reload_Click"/>
+                    <!-- Unlocked only: a locked panel is anchored where it is. -->
+                    <Button x:Name="MaximizeButton" Content="⛶"
+                            ToolTip="Fill this screen"
+                            Visibility="Collapsed"
+                            Style="{StaticResource ToolButton}"
+                            Click="ToggleMaximize_Click"/>
+                    <Button Content="✕" ToolTip="Shut down the dashboard"
+                            Style="{StaticResource ToolButton}"
+                            Click="Close_Click"/>
+                </StackPanel>
+            </Grid>
+
+            <!--
+                Holds the section grid, which fills whatever height is left over.
+                There is no scrollbar out here on purpose: the grid always fits the
+                window exactly so its rows have a definite height, and it's that
+                height each group scrolls its tiles inside.
+                Sections are built in code so they can be swapped per focused app.
+            -->
+            <Grid x:Name="ContentRoot"/>
+
+        </DockPanel>
+
+        <!--
+            Resize grip, overlaid on the corner rather than docked so it doesn't take
+            a strip of height away from the grid. Sized for a fingertip. Shown only
+            while unlocked, like the ⛶ button.
+        -->
+        <Border x:Name="ResizeGrip" Width="28" Height="28"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                Visibility="Collapsed"
+                Background="Transparent" Cursor="SizeNWSE"
+                ToolTip="Drag to resize the panel"
+                MouseLeftButtonDown="ResizeGrip_MouseLeftButtonDown">
+            <Path Stroke="#6A6A70" StrokeThickness="1.6"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                  Margin="0,0,5,5"
+                  Data="M 2,16 L 16,2  M 7,16 L 16,7  M 12,16 L 16,12"/>
+        </Border>
+
+        <!--
+            The window picker, and the only kind of modal this panel can have. A real
+            dialog is its own HWND and takes focus when it opens, which is the one thing
+            this window must never do — so "modal" here means a layer inside the same
+            window: it covers the panel, so nothing behind it can be tapped, and the dim
+            backdrop is itself the dismiss. Last child of the Grid, so it draws over
+            everything including the grip.
+
+            The card is a 1-column Grid rather than a DockPanel because the tablet reads
+            this layout too, and a DockPanel would have to declare the Cancel button
+            before the list it sits under.
+        -->
+        <Grid x:Name="OverlayRoot" Visibility="Collapsed" Background="#D8141416"
+              MouseLeftButtonDown="OverlayBackdrop_MouseLeftButtonDown">
+            <Border Background="#252526" BorderBrush="#3F3F46" BorderThickness="1"
+                    CornerRadius="12" Margin="16" Padding="6"
+                    MaxWidth="560" MaxHeight="520"
+                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                    MouseLeftButtonDown="OverlayCard_MouseLeftButtonDown">
+                <Grid x:Name="OverlayBody">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock x:Name="OverlayTitle" Grid.Row="0"
+                               Style="{StaticResource SectionHeader}"
+                               TextWrapping="Wrap"/>
+
+                    <ScrollViewer Grid.Row="1" Focusable="False"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  PanningMode="VerticalOnly">
+                        <Grid x:Name="OverlayList"/>
+                    </ScrollViewer>
+
+                    <!-- A tile rather than a plain button: the tablet is shown this card
+                         as tiles, and a tile is what it knows how to tap. -->
+                    <Button x:Name="OverlayDismiss" Grid.Row="2"
+                            Style="{StaticResource TileButton}"
+                            Click="OverlayDismiss_Click">
+                        <TextBlock Text="Cancel"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+
+      </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,273 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deckhand configuration",
+  "description": "The shape of dashboard.json and dashboard.local.json. The local file is merged over the shared one on load: keys in it win, objects merge a level at a time, and a list or plain value replaces the shared one outright.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 12,
+          "description": "How many columns the dashboard width is divided into."
+        },
+        "rows": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 12,
+          "description": "How many rows the dashboard height is divided into. Rows share the height equally; at 12 rows a row is shorter than a tile, so one-row groups scroll from the start."
+        }
+      }
+    },
+
+    "remote": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether starting up asks 'laptop or tablet?'. Off, nothing listens and the token is never read. --remote on the command line serves regardless; this only decides whether the question is asked."
+        },
+        "listen": {
+          "type": "string",
+          "default": "http://+:8787/",
+          "description": "The HttpListener prefix to serve on. '+' is every interface; narrow it to one address, or to http://127.0.0.1:8787/ behind a tunnel."
+        },
+        "token": {
+          "type": "string",
+          "description": "Don't put the token here — this file travels with the project. Keep it in the token file instead, which wins over this whenever it has anything in it."
+        },
+        "tokenFile": {
+          "type": "string",
+          "description": "Where the token really lives: one line, nothing else. Defaults to %USERPROFILE%\\.deckhand_token."
+        },
+        "allowedHosts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Names (besides addresses, which need no permission) the panel may be reached by — a Tailscale name, a tunnel's hostname. A name has to be listed because what it points at isn't ours to decide."
+        }
+      }
+    },
+
+    "browsers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Process names that count as a browser, for URL tiles opening in the focused one. Defaults to chrome, msedge, firefox, brave, vivaldi, opera, opera_gx."
+    },
+
+    "profiles": {
+      "type": "array",
+      "description": "Names for the apps worth recognising. A profile holds no tiles — sections written for its label appear while it's the focused app. First match wins, so order most-specific first.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "match": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Process names that activate this profile, with or without .exe. Case-insensitive."
+          },
+          "titleMatch": {
+            "type": "string",
+            "description": "Optional regex the window title must also match, for splitting one app into several profiles."
+          }
+        }
+      }
+    },
+
+    "sections": {
+      "type": "array",
+      "description": "Every button on the dashboard. A section with no profiles is always on screen; one that lists them shows only while a matching app is focused.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string" },
+          "profiles": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Profile labels this section belongs to. Omit for a section that's always shown."
+          },
+          "source": { "$ref": "#/definitions/sourceSettings" },
+          "columns": { "$ref": "#/definitions/gridRange" },
+          "rows": { "$ref": "#/definitions/gridRange" },
+          "tilesPerRow": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Tiles per row inside this section. Defaults to the section's width in columns."
+          },
+          "apps": { "type": "array", "items": { "$ref": "#/definitions/appEntry" } },
+          "snippets": { "type": "array", "items": { "$ref": "#/definitions/snippetEntry" } }
+        }
+      }
+    },
+
+    "apps": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/appEntry" },
+      "description": "Shorthand for a single always-visible \"Apps\" section."
+    },
+
+    "snippets": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/snippetEntry" },
+      "description": "Shorthand for a single always-visible \"Snippets\" section."
+    }
+  },
+
+  "definitions": {
+    "sourceSettings": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Fills the section with one tile per subdirectory of a folder. With a \"command\" the tiles type it into the focused window (gate the section with \"profiles\" naming the windows it types into — the tap re-checks that list); without one, tapping opens the folder itself.",
+      "required": [ "folders" ],
+      "properties": {
+        "folders": {
+          "type": "string",
+          "description": "The directory whose subdirectories become tiles. %VARIABLES% are expanded."
+        },
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Directory names to leave out of the scan."
+        },
+        "split": {
+          "type": "string",
+          "description": "A regex (case-insensitive) dealing the folders onto the two sides of the section's ⇄ switch: matches on one, the rest on the other. Its first capture group becomes {id} in the commands. Omitted, there is no switch."
+        },
+        "matchLabel": {
+          "type": "string",
+          "default": "matching",
+          "description": "What the ⇄ switch calls the folders \"split\" matches."
+        },
+        "otherLabel": {
+          "type": "string",
+          "default": "others",
+          "description": "What the ⇄ switch calls the rest."
+        },
+        "command": {
+          "type": "string",
+          "description": "Typed into the focused window on tap. {name} is the folder's name, {id} what \"split\" captured, {dir} the full path. Omit it and tapping opens the folder instead, like an app tile pointed at it."
+        },
+        "submit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Press Enter after typing, so the command runs rather than just sitting there."
+        },
+        "commands": {
+          "type": "array",
+          "description": "Extra commands reached by expanding a tile with its ▾. None means no ▾.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string" },
+              "command": { "type": "string", "description": "Same placeholders as \"command\"." }
+            }
+          }
+        },
+        "commandColumns": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2,
+          "description": "Columns in a tile's expanded command list."
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 24,
+          "description": "Cap on folder tiles. The section header says when tiles were dropped."
+        },
+        "subtitles": {
+          "type": "string",
+          "description": "A file — or a glob like \"%USERPROFILE%/notes/titles_*\" — of \"key|text\" lines. A folder whose {id} (or name) appears as a key gets the text as a second line on its tile. The format is the whole contract; anything can write it."
+        }
+      }
+    },
+
+    "gridRange": {
+      "description": "A width (3 — packed into the first gap that fits) or a pinned 1-based range (\"1-3\" — those tracks, wherever the other sections end up).",
+      "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "string", "pattern": "^\\s*\\d+\\s*(?:[-:]\\s*\\d+\\s*)?$" }
+      ]
+    },
+
+    "appEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "path": {
+          "type": "string",
+          "description": "A program, a folder, or an http(s) URL — a URL opens as a new tab rather than launching anything."
+        },
+        "args": {
+          "type": "string",
+          "description": "Command line for the program. On a URL tile these are browser switches, applied only when a browser is named."
+        },
+        "browser": {
+          "type": "string",
+          "description": "URL tiles only. Omit for the focused browser, \"default\" for the default one, or a process name like \"msedge\" to pin it."
+        },
+        "deElevate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Launch at normal user integrity instead of inheriting the dashboard's elevation. On by default; set false on the rare tile that should run elevated on purpose."
+        },
+        "windows": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Process names whose windows the tile goes to, for when the thing launched isn't the thing that ends up on screen (git-bash.exe starts a mintty and exits)."
+        },
+        "span": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "How many of the section's tile columns this tile occupies."
+        },
+        "color": { "$ref": "#/definitions/tileColor" }
+      }
+    },
+
+    "snippetEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "text": { "type": "string", "description": "Dropped at the caret. \\n is a newline, so the editor's auto-indent applies per line. {date}, {time} and {clipboard} are resolved at the moment of the tap: the local short date and time, and whatever text is on the clipboard." },
+        "method": {
+          "type": "string",
+          "enum": [ "paste", "type" ],
+          "default": "paste",
+          "description": "\"paste\" goes via the clipboard and Ctrl+V; \"type\" is sent a character at a time and leaves the clipboard alone."
+        },
+        "keys": {
+          "type": "string",
+          "description": "Keys pressed after the text lands, in order: \"tab\", \"enter\", \"escape\", separated by spaces or commas."
+        },
+        "span": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "How many of the section's tile columns this tile occupies."
+        },
+        "color": { "$ref": "#/definitions/tileColor" }
+      }
+    },
+
+    "tileColor": {
+      "type": "string",
+      "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+      "description": "Accent for the tile's outline, on the panel and the tablet alike: #RGB or #RRGGBB — the two forms WPF and a browser agree about."
+    }
+  }
+}

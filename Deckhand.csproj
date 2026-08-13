@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Deckhand</RootNamespace>
+
+    <!-- Runs the app elevated; see the comments in app.manifest for why. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- The exe's icon, and so the taskbar's and Explorer's. Drawn by icon.ps1, which
+         also draws the ones the tablet installs. -->
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Draws the QR in the remote status window. The matrix is rendered to a WPF
+         bitmap by our own code; only the encoding comes from the package. -->
+    <PackageReference Include="QRCoder" Version="1.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="dashboard.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+
+    <!-- The remote panel's page, and the files a browser fetches for itself so the page
+         can be installed to a tablet's home screen rather than opened as a tab. Embedded
+         rather than copied: none of it is configuration, and a deployed copy shouldn't be
+         able to lose any of it. The logical names are spelled out because they are what
+         RemoteServer looks the files up by — moving the files must not move the names —
+         and the paths those are served at are the Served table there. -->
+    <EmbeddedResource Include="Remote/Web/remote.html" LogicalName="Deckhand.remote.html" />
+    <EmbeddedResource Include="Remote/Web/manifest.webmanifest" LogicalName="Deckhand.manifest.webmanifest" />
+    <EmbeddedResource Include="Remote/Web/sw.js" LogicalName="Deckhand.sw.js" />
+    <EmbeddedResource Include="Remote/Web/icon-192.png" LogicalName="Deckhand.icon-192.png" />
+    <EmbeddedResource Include="Remote/Web/icon-512.png" LogicalName="Deckhand.icon-512.png" />
+    <EmbeddedResource Include="Remote/Web/icon-180.png" LogicalName="Deckhand.icon-180.png" />
+  </ItemGroup>
+
+</Project>

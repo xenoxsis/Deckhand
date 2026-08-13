@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tablet remote — Deckhand</title>
+<meta name="description" content="Serving the Deckhand panel to a tablet's browser: setup, the status window, the config keys, and the security model.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+
+<nav class="side" aria-label="Documentation">
+  <a class="brand" href="index.html"><span class="brand-mark">&#9698;</span>Deckhand <span class="brand-sub">docs</span></a>
+  <ul class="nav">
+    <li><a href="index.html">Getting started</a></li>
+    <li><a href="configuration.html">Configuration reference</a></li>
+    <li><a href="examples.html">Example configs</a></li>
+    <li><a href="tablet.html" aria-current="page">Tablet remote</a></li>
+  </ul>
+  <p class="nav-label">On this page</p>
+  <ul class="nav toc" id="toc"></ul>
+  <button class="theme" id="theme" type="button">&#9689; Theme</button>
+</nav>
+
+<main id="main">
+<div class="wrap">
+
+<h1>The panel on a tablet</h1>
+<p class="lede">The same panel, drawn in a tablet's browser and reachable over your own
+network — so the control surface can sit beside the laptop instead of on top of its screen.
+The work still happens on the laptop; the tablet only ever supplies the tap.</p>
+
+<h2 id="setup">Setting it up</h2>
+
+<h3 id="token">1. Write a token</h3>
+
+<p>Every request needs it, and what's on the other side of it launches and types things as
+administrator — so it wants to be long and random rather than memorable. It lives in a file
+outside the project, one line, nothing else:</p>
+
+<figure class="code">
+<figcaption>PowerShell — writes 40 random hex characters to the default token file</figcaption>
+<pre><code class="lang-shell">$bytes = [byte[]]::new(20)
+[System.Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+(($bytes | ForEach-Object { $_.ToString("x2") }) -join "") |
+  Set-Content "$env:USERPROFILE\.deckhand_token" -Encoding ascii</code></pre>
+</figure>
+
+<p>Sixteen characters is the enforced minimum; the status window says <em>token too short</em>
+and refuses to serve below it. Don't put the token in <code>dashboard.json</code> — that file
+travels with the project, so a token in it ends up in every copy, backup and build output.</p>
+
+<h3 id="enable">2. Turn the remote on</h3>
+
+<p>In <code>dashboard.local.json</code>, so the setting stays with the machine rather than the
+project:</p>
+
+<figure class="code">
+<figcaption>dashboard.local.json</figcaption>
+<pre><code class="lang-json">{ "remote": { "enabled": true } }</code></pre>
+</figure>
+
+<p>That makes startup <em>ask</em> "on this laptop, or on a tablet?" — it doesn't force
+anything. Start with <code>--remote</code> to skip the question, which is what a pinned
+shortcut wants:</p>
+
+<figure class="code">
+<figcaption>PowerShell</figcaption>
+<pre><code class="lang-shell">Start-Process bin\Debug\net9.0-windows\Deckhand.exe -ArgumentList --remote</code></pre>
+</figure>
+
+<p>The first start opens a Windows Firewall prompt for the port. Allow it on private
+networks.</p>
+
+<h3 id="scan">3. Scan the QR</h3>
+
+<p>The status window on the laptop lists the addresses the tablet can use and shows the first
+of them as a QR code. Press <strong>Show</strong> to reveal the token, and the QR grows to
+carry it too: scanning is then the whole of the setup, because the page stores the token and
+scrubs it out of the address bar.</p>
+
+<p>The token rides in the URL <em>fragment</em> (<code>#token=…</code>), which browsers never
+send to the server — so it doesn't appear in any request, log or proxy on the way. Masked
+again, the QR encodes only the address, which keeps <strong>Show</strong> the one switch that
+reveals the secret.</p>
+
+<div class="note">
+  <span class="note-title">Typing it by hand instead</span>
+  <p>Open <code>http://&lt;address&gt;:8787/</code> on the tablet and paste the token into the
+  box the page shows. It's kept in the browser's local storage from then on, so this is a
+  once-per-tablet job.</p>
+</div>
+
+<h2 id="status-window">The status window</h2>
+
+<p>In tablet mode this small ordinary window is all that's on the laptop's screen. The panel
+behind it is still built, still watches which app is focused and still does all the work — it
+just isn't drawn here.</p>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>What it shows</th><th>Why it's there</th></tr></thead>
+  <tbody>
+    <tr><td>Addresses, and the first as a QR</td><td><code>+</code> in the listen prefix isn't something you can type into a tablet, so it's expanded into this machine's real addresses — interfaces with a default gateway first, since a WSL, Hyper-V or VPN-stub address is one nothing else on the network can reach. All are listed anyway, because guessing wrong shouldn't hide the one that works.</td></tr>
+    <tr><td>The token, masked until <strong>Show</strong></td><td>Also names <em>where</em> the token came from, so "is it reading my file?" is answerable without an experiment.</td></tr>
+    <tr><td>Whether the tablet is getting through, and which one</td><td>A coloured dot plus the paired device's short id and the address it last called from.</td></tr>
+    <tr><td>Whether the tablet is keeping its own screen awake</td><td>The page reports what it managed on every request — see <a href="#wake">keeping the screen on</a>.</td></tr>
+    <tr><td>A log of everything between the two sides</td><td>Taps, rejections, reloads, pairing. The same log the panel keeps.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="buttons">Its buttons</h3>
+
+<ul>
+  <li><strong>Unpair</strong> — lets go of the paired device so another one with the right
+    token can take the session. For swapping tablets without re-reading anything.</li>
+  <li><strong>&#8635; Reload</strong> — re-reads the config and restarts the server, which
+    also unpairs. Use it after moving to another Wi-Fi: it re-reads the addresses too.</li>
+  <li><strong>Quit</strong> — stops the server and ends the process.</li>
+  <li><strong>&#10005;</strong> — <em>doesn't</em> quit. It hides the window to the
+    notification area and the panel goes on serving. Hover the tray icon for the same status
+    line, double-click to bring the window back, right-click for Reload and Quit.</li>
+</ul>
+
+<div class="note warn">
+  <span class="note-title">The tray icon starts out hidden</span>
+  <p>Windows 11 hides tray icons it hasn't been told about, so the first time you press
+  <code>&#10005;</code> the icon lands behind the <code>^</code> chevron. Drag it onto the
+  taskbar to keep it there. A notification appears either way, since <code>&#10005;</code>
+  everywhere else means gone.</p>
+</div>
+
+<h2 id="config">The config keys</h2>
+
+<p>Full descriptions are in the <a href="configuration.html#remote">reference</a>; these are
+the shapes worth copying.</p>
+
+<figure class="code">
+<figcaption>The normal case — your own network, every interface</figcaption>
+<pre><code class="lang-json">"remote": { "enabled": true }</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>Pinned to one interface, so the port isn't opened on the others</figcaption>
+<pre><code class="lang-json">"remote": {
+  "enabled": true,
+  "listen": "http://192.168.1.20:8787/"
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>Behind a tunnel: listen only on loopback, and allow the name it arrives as</figcaption>
+<pre><code class="lang-json">"remote": {
+  "enabled": true,
+  "listen": "http://127.0.0.1:8787/",
+  "allowedHosts": [ "desk-laptop.tail1234.ts.net" ]
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>A token file somewhere else — a synced folder, a removable drive</figcaption>
+<pre><code class="lang-json">"remote": {
+  "enabled": true,
+  "tokenFile": "D:/keys/deckhand.token"
+}</code></pre>
+</figure>
+
+<div class="note">
+  <span class="note-title">Why a name needs permission and an address doesn't</span>
+  <p>Anyone can point a hostname at your machine and have a page of theirs talk to the panel
+  from inside its own origin. An address can't be moved like that. So names are listed rather
+  than accepted, and a request calling this machine anything not listed is refused.</p>
+</div>
+
+<h2 id="install">Installing the page on the tablet</h2>
+
+<p>The page can go on the tablet's home screen and open as an app rather than as a browser
+tab: its own icon, no address bar, the whole screen given to tiles. Nothing about how it works
+changes — a control surface you reach through a tab list is a control surface with two taps in
+front of it, and an address bar is 40 wasted pixels across a panel sized to fit exactly.</p>
+
+<ul>
+  <li><strong>iPad / Safari</strong> — Share &rarr; <em>Add to Home Screen</em>.</li>
+  <li><strong>Android / Chrome</strong> — menu &rarr; <em>Add to Home screen</em> or
+    <em>Install app</em>.</li>
+</ul>
+
+<p>The laptop serves the manifest, the icons and a service worker alongside the page, so the
+shell is cached and a launch is instant. When you rebuild the app with a changed page, the
+open tab <strong>replaces itself</strong> — the cache is named after the build. With the
+laptop stopped, a launch still comes up from cache with the connection dot red; with nothing
+cached, you get <em>the laptop isn't answering</em> and a <strong>Try again</strong> button
+rather than the browser's own error page, which in a window with no address bar would be a
+dead end.</p>
+
+<h2 id="wake">Keeping the tablet's screen on</h2>
+
+<p>A panel that goes black after 30 seconds isn't a panel. The page asks for a screen wake
+lock; where that isn't available it falls back to playing a tiny muted looping video, which
+most platforms accept as a reason to stay awake. It reports which it managed on every request,
+so the laptop's status window and log say so too:</p>
+
+<ul>
+  <li><strong>screen kept awake</strong> — a real wake lock.</li>
+  <li><strong>best effort</strong> — the video fallback.</li>
+  <li><strong>may sleep</strong> — neither worked; set the tablet's own screen timeout
+    instead.</li>
+</ul>
+
+<h2 id="security">What stops it being a remote shell</h2>
+
+<p>The honest summary: this opens a port that can fire your own tiles as administrator. That
+is worth understanding rather than trusting, so here is exactly what the protocol can and
+can't express.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head"><span class="key-name">Ids only</span></div>
+    <p>A request can name a tile that is <em>already configured and already on screen</em>.
+    There is no field anywhere in the protocol that carries a path, a command, or text to
+    type. The worst a request can do is fire one of your own tiles — there is no "run this"
+    to reach for, because no such message exists.</p>
+    <p>The ids are content-addressed hashes rebuilt with every snapshot, so an id can only
+    ever name a tile that was on screen when the tablet last drew.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">The same tap, not a second implementation</span></div>
+    <p>The server raises the click on that very button in the panel. Nothing about what a tile
+    does is reimplemented over HTTP, so the two can't drift apart: URL tiles still pick the
+    focused browser, <code>deElevate</code> still de-elevates, an app tile's wide side still
+    asks which window.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">A token on every call</span></div>
+    <p>Hashed and compared in constant time, so a wrong token leaks nothing about how wrong it
+    was. Sixteen characters is the enforced minimum and the server refuses to start below it.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">One device at a time</span></div>
+    <p>The page generates an id for itself once and keeps it; the session pins to <em>that</em>
+    rather than to an address, so a new DHCP lease or a different Wi-Fi doesn't bounce your own
+    tablet, and "second device refused" still means something behind a tunnel where every
+    client shares one address. <strong>Unpair</strong> is how you hand the session over.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">Guessing is rationed per address</span></div>
+    <p>Ten wrong tokens from one address inside a minute locks <em>that address</em> out for a
+    minute — so someone spraying guesses can only lock themselves out, and can't deny your
+    tablet its own first pairing. The table of addresses is capped, so cycling through
+    addresses grows nothing.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">Names are allow-listed, bodies are capped</span></div>
+    <p>A request calling the machine a name that isn't <a href="#config">allowed</a> is
+    refused, and a request body is capped at a kilobyte — an id is 16 characters.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">A tap can be refused for being untimely</span></div>
+    <p>While one of the dashboard's own windows has focus, a tap is refused: the panel would
+    otherwise send keystrokes to itself. While the window picker is open, a tap for anything
+    behind it comes back with a conflict and the picker stays put — the same answer a finger on
+    the panel gets, since the modal covers those tiles there too.</p>
+  </div>
+</div>
+
+<div class="note warn">
+  <span class="note-title">It's plain HTTP on your own network</span>
+  <p>There is no TLS here: anyone who can watch the traffic between the tablet and the laptop
+  can read the token. That's an acceptable trade on a home or office network you control, and
+  the reason the default is off, the port is only opened when asked, and the whole protocol is
+  built so the token buys nothing but your own tiles. For anything crossing a network you
+  don't control, listen on loopback only and put a tunnel (Tailscale, an SSH forward) in
+  front — then list the name it arrives as in <code>allowedHosts</code>.</p>
+</div>
+
+<h2 id="tap-latency">Why the tablet keeps up</h2>
+
+<p>The page holds one request open at a time. When there's nothing new, the laptop parks it for
+up to 25 seconds and releases it the instant the panel publishes something — so a focus change
+or an expanded tile lands on the tablet immediately, and the tablet's radio wakes for one
+answer instead of for a poll every second. A parked request counts as "seen just now", so the
+connection dot doesn't flicker during quiet stretches.</p>
+
+<h2 id="troubleshooting">Troubleshooting</h2>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Symptom</th><th>Likely cause</th></tr></thead>
+  <tbody>
+    <tr><td>The page doesn't load at all</td><td>Wrong address — try the others the status window lists; a WSL or VPN address can't be reached from the network. Otherwise the firewall prompt was dismissed, or another program holds port 8787.</td></tr>
+    <tr><td><em>not serving — token too short</em></td><td>The token file is missing, empty, or under 16 characters. The status window names the file it read.</td></tr>
+    <tr><td>Taps do nothing, page looks fine</td><td>Check the laptop's log. A tap while one of the dashboard's own windows has focus is refused by design — click into your work first.</td></tr>
+    <tr><td><em>Another device is paired</em></td><td>Press <strong>Unpair</strong> on the laptop, then reload the page on the tablet.</td></tr>
+    <tr><td>Every request refused for a minute</td><td>Ten wrong tokens from that address inside a minute. Wait it out and check the token.</td></tr>
+    <tr><td>The tablet shows an old set of tiles</td><td>Its page is older than the build. Reloading picks up the new one; the service worker does it by itself when it next reaches the laptop.</td></tr>
+    <tr><td>Tiles never change when you switch apps</td><td>The sections may not be written for profiles at all. The panel's context label — shown on the tablet too — names what it thinks is focused.</td></tr>
+    <tr><td>The tablet's screen keeps sleeping</td><td><em>may sleep</em> in the status window: neither wake method worked. Set the tablet's own screen timeout.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="pager">
+  <a href="examples.html">
+    <span>Previous</span>
+    <strong>&larr; Example configs</strong>
+  </a>
+  <span></span>
+</div>
+
+<footer>
+  <p>The project <a href="../README.md">README</a> has the long version of the security
+  reasoning, including what was tested and how.</p>
+</footer>
+
+</div>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

@@ -1,0 +1,293 @@
+{
+  // A complete, working configuration to start from: copy it to dashboard.json
+  // beside this file and edit. The real dashboard.json is not in the repository —
+  // a config is a list of this machine's paths, the URLs it opens and the text it
+  // types into other windows, none of which anyone else wants a copy of.
+  //
+  // Names the file that gives an editor completion and squiggles for everything below.
+  // The dashboard itself checks for misspelled keys on load too (and "--check" does it
+  // without starting anything), but the editor catches them while they're being typed.
+  "$schema": "./dashboard.schema.json",
+
+  "layout": {
+    "columns": 12,
+    "rows": 12
+  },
+
+  // No "token" here on purpose. This file is copied next to the exe by the build and
+  // travels with the project, so a token written here ends up in every copy, backup and
+  // build output of it — and what's on the other side of it types and launches things as
+  // administrator. It's read from %USERPROFILE%\.deckhand_token instead, one line,
+  // nothing else; "tokenFile" overrides where to look.
+  //
+  // "enabled" is false here for a related reason: whether a machine offers its panel to
+  // the network is that machine's business, not the project's. dashboard.local.json —
+  // merged over this file on load, and not travelling with it — is where this machine
+  // turns the remote on, along with anything else specific to it.
+  "remote": {
+    "enabled": false,
+    "listen": "http://+:8787/"
+  },
+
+  // Names for the apps worth recognising, and nothing else — no tiles and no placement
+  // live here. A profile answers "what is the focused window", and every section below
+  // that names one appears while it's the answer. Where the buttons are is "sections",
+  // always, so there is one place to go looking.
+  //
+  // First match wins, so the specific goes above the general: a profile with a
+  // "titleMatch" can decline a window, which is how one app is split into several.
+  // "Git Bash (WT)" is exactly that: Git Bash hosted inside Windows Terminal is the
+  // process WindowsTerminal with MINGW in the title, so it sits above "Terminal" and
+  // takes those windows first, leaving plain PowerShell tabs to fall through. A
+  // profile that could never be reached is reported on load rather than left to be
+  // noticed as tiles that don't turn up.
+  "profiles": [
+    { "label": "VS Code", "match": [ "Code" ] },
+    { "label": "Outlook", "match": [ "OUTLOOK", "olk" ] },
+    { "label": "Git Bash (WT)", "match": [ "WindowsTerminal" ], "titleMatch": "MINGW|MSYS" },
+    { "label": "Terminal", "match": [ "WindowsTerminal", "powershell", "pwsh", "cmd" ] },
+    { "label": "Browser", "match": [ "chrome", "msedge", "firefox" ] },
+    { "label": "Git Bash", "match": [ "mintty" ] }
+  ],
+
+  // Every button in the dashboard. A section with no "profiles" is always on screen; one
+  // that lists them is shown only while a matching app is focused, and its cells are
+  // free for anything unpinned in the meantime. Sections are pinned here
+  // ("columns": "3-6"), so two of them sharing rows would be drawn on top of each other
+  // — a pin is honoured, not packed around.
+  "sections": [
+    {
+      "label": "Apps",
+      "columns": "1-2",
+      "rows": "1-12",
+      "tilesPerRow": 1,
+      "apps": [
+        {
+          "label": "Chrome",
+          "path": "chrome",
+          "deElevate": true
+        },
+        {
+          "label": "VS Code",
+          "path": "code",
+          "deElevate": false
+        },
+        {
+          "label": "Git Bash",
+          "path": "C:\\Program Files\\Git\\git-bash.exe",
+          "deElevate": false
+        },
+        {
+          "label": "Notepad++",
+          "path": "C:\\Program Files\\Notepad++\\notepad++.exe",
+          "deElevate": true
+        },
+        // Both of these open in Explorer, so the wide side goes to whichever Explorer
+        // window is frontmost rather than to this folder's — Explorer is one process for
+        // all of them. The + always opens the folder itself. Paths are taken literally,
+        // so write out the real ones rather than %USERPROFILE%.
+        {
+          "label": "Downloads",
+          "path": "C:\\Users\\you\\Downloads",
+          "deElevate": true
+        },
+        {
+          "label": "Source",
+          "path": "C:\\src",
+          "deElevate": true
+        }
+      ]
+    },
+
+    // Snippets are plain text dropped at the caret — "paste" (default) goes via the
+    // clipboard and Ctrl+V, "type" is sent a character at a time and leaves the
+    // clipboard alone. \n is a newline, so the editor's auto-indent applies to each
+    // line as it arrives; blank lines are where the caret usually wants to end up.
+    {
+      "label": "VS Code",
+      "profiles": [ "VS Code" ],
+      "columns": "3-6",
+      "rows": "1-4",
+      "tilesPerRow": 1,
+      "snippets": [
+        {
+          "label": "Console Log",
+          "text": "log",
+          "method": "type",
+          "keys": "escape tab"
+        },
+        // "keys" hands the rest of the job to VS Code: type the prefix, press Tab, and
+        // it expands its own snippet — placeholders selected, so the component name is
+        // typed once and lands in all three places. Two things this leans on: the ES7
+        // React snippets extension, which is where "rafce" comes from, and
+        // "editor.tabCompletion": "onlySnippets" in settings.json — off, which is the
+        // default, Tab only indents. Escape first because typing the prefix opens the
+        // suggestion list, and Tab aimed at that list accepts whatever it has
+        // highlighted; dismissing it leaves Tab to expand the prefix and nothing else.
+        {
+          "label": "React cmp",
+          "text": "rafce",
+          "method": "type",
+          "keys": "escape tab"
+        }
+      ]
+    },
+
+    {
+      "label": "Outlook",
+      "profiles": [ "Outlook" ],
+      "columns": "3-6",
+      "rows": "1-8",
+      "tilesPerRow": 1,
+      "snippets": [
+        {
+          "label": "Greeting",
+          "text": "Hi,\n\n"
+        },
+        {
+          "label": "Sign-off",
+          "text": "Thanks,\nSam"
+        },
+        {
+          "label": "Email",
+          "text": "sam@example.com",
+          "method": "type"
+        },
+        {
+          "label": "Will review",
+          "text": "Thanks for sending this over — I'll review it and get back to you."
+        },
+        {
+          "label": "Availability",
+          "text": "I'm free any time tomorrow afternoon if a quick call would help."
+        }
+      ]
+    },
+
+    // "Git Bash (WT)" is listed too so a bash running inside Windows Terminal keeps
+    // these git one-liners, the way it did when that window just counted as "Terminal".
+    {
+      "label": "Terminal",
+      "profiles": [ "Terminal", "Git Bash (WT)" ],
+      "columns": "4-6",
+      "rows": "1-8",
+      "tilesPerRow": 1,
+      "snippets": [
+        {
+          "label": "git status",
+          "text": "git status"
+        },
+        {
+          "label": "git log",
+          "text": "git log --oneline -20"
+        },
+        {
+          "label": "dotnet build",
+          "text": "dotnet build"
+        }
+      ]
+    },
+
+    // Two Git Bash blocks, one above the other. Nothing ties them together but the
+    // profile name, so either can be moved, split or dropped on its own.
+    //
+    // Every snippet in both is "type", not the default "paste": mintty doesn't map
+    // Ctrl+V to paste, so the clipboard route would put a control character in the
+    // prompt instead. This is the same reason the branch tiles type their commands.
+    //
+    // "keys": "enter" runs the line. The ones that leave it out are incomplete
+    // commands, so the caret is left at the end for a branch name or a message.
+    {
+      "label": "Snippets",
+      "profiles": [ "Git Bash" ],
+      "columns": "3-6",
+      "rows": "1-8",
+      "tilesPerRow": 2,
+      "snippets": [
+        {
+          "label": "Fetch All",
+          "text": "git fetch --all --prune",
+          "method": "type",
+          "keys": "enter"
+        },
+        {
+          "label": "Get Branch Name",
+          "text": "git branch --show-current",
+          "method": "type",
+          "keys": "enter"
+        },
+        {
+          "label": "Make Branch",
+          "text": "newbranch.sh ",
+          "method": "type"
+        },
+        {
+          "label": "Make WI Branch",
+          "text": "newbranch.sh wi12345-",
+          "method": "type"
+        }
+      ]
+    },
+    // The repos that aren't branches, as ordinary snippets: each types the shell alias
+    // that knows where it lives ("shell -dir" would only change directory) and presses
+    // Enter. The profiles are what keep them out of everything that isn't a shell — the
+    // same gate as the Work Items below, because they type into the same place.
+    {
+      "label": "Repos",
+      "profiles": [ "Git Bash", "Git Bash (WT)" ],
+      "columns": "3-6",
+      "rows": "9-12",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Shell", "text": "shell", "method": "type", "keys": "enter" },
+        { "label": "Frontend UI", "text": "ui", "method": "type", "keys": "enter" },
+        { "label": "Tools", "text": "tools", "method": "type", "keys": "enter" },
+        { "label": "Reviews", "text": "reviews", "method": "type", "keys": "enter" }
+      ]
+    },
+
+    // One tile per directory under the git root — the dashboard only scans folders and
+    // types the command written here; everything tool-specific about it is this config's
+    // content, not the dashboard's knowledge. "split" deals work item directories
+    // (…wi<number>…) onto the tiles and everything else — master, release branches —
+    // behind the ⇄ switch; its capture group is "{id}". The excluded four are the repos
+    // above: as scanned directories they'd get "goto" and the eight commands, and none
+    // of that works outside a branch.
+    //
+    // "subtitles" is a glob of "key|text" lines matched against {id} — here it is
+    // pointed at a cache some other tool happens to write in that format, which is why
+    // work item titles appear under the branch names. Ordering comes from the
+    // dashboard's own record of taps (%USERPROFILE%\.deckhand_history), newest
+    // first, then folder change time — so it starts alphabet-ish and learns.
+    {
+      "label": "Work Items",
+      "profiles": [ "Git Bash", "Git Bash (WT)" ],
+      "columns": "7-12",
+      "rows": "1-12",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "C:/git",
+        "exclude": [ "Shell", "FrontEnd-UI", "Tools", "Reviews" ],
+        "split": ".*wi(\\d+)",
+        "matchLabel": "WI branches",
+        "otherLabel": "Non-WI branches",
+        "command": "goto {name}",
+        "submit": true,
+        "commands": [
+          { "label": "Web", "command": "web {name}" },
+          { "label": "API", "command": "api {name}" },
+          { "label": "Admin", "command": "admin {name}" },
+          { "label": "Docs", "command": "docs {name}" },
+          { "label": "Shared", "command": "shared {name}" },
+          { "label": "Backend", "command": "be {name}" },
+          { "label": "e2e Tests", "command": "e2e {name}" },
+          { "label": "src", "command": "src {name}" }
+        ],
+        "commandColumns": 2,
+        "max": 24,
+        "subtitles": "%USERPROFILE%/.branch_cache/titles_*"
+      }
+    }
+
+  ]
+}

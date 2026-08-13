@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Example configs — Deckhand</title>
+<meta name="description" content="Five complete dashboard.json files to copy: a starter, a writer's desk, a developer's panel, a support desk, and a folder launcher.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+
+<nav class="side" aria-label="Documentation">
+  <a class="brand" href="index.html"><span class="brand-mark">&#9698;</span>Deckhand <span class="brand-sub">docs</span></a>
+  <ul class="nav">
+    <li><a href="index.html">Getting started</a></li>
+    <li><a href="configuration.html">Configuration reference</a></li>
+    <li><a href="examples.html" aria-current="page">Example configs</a></li>
+    <li><a href="tablet.html">Tablet remote</a></li>
+  </ul>
+  <p class="nav-label">On this page</p>
+  <ul class="nav toc" id="toc"></ul>
+  <button class="theme" id="theme" type="button">&#9689; Theme</button>
+</nav>
+
+<main id="main">
+<div class="wrap">
+
+<h1>Example configs</h1>
+<p class="lede">Five complete files, each one a whole <code>dashboard.json</code> you can save
+and run. They're invented rather than borrowed from anyone's real panel, so the paths, labels
+and commands are all yours to replace.</p>
+
+<div class="note">
+  <span class="note-title">Trying one</span>
+  <p>Copy it over your <code>dashboard.json</code> and save. The panel reloads itself about
+  half a second later. If a group doesn't appear, the app it's written for probably isn't
+  focused — the panel's top-left strip names the profile it currently sees. Run
+  <code>Deckhand.exe --check</code> to have every mistake in the file listed at once.</p>
+</div>
+
+<h2 id="starter">1. Starter</h2>
+
+<p>The smallest thing worth having: a handful of apps and snippets, always on screen, no grid
+placement to think about. The <code>apps</code> and <code>snippets</code> shorthand each
+become one section on their own.</p>
+
+<p><strong>Shows:</strong> the shorthand lists, a program tile, a folder tile, a URL tile,
+<code>{date}</code>, and <code>method: "type"</code>.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "apps": [
+    { "label": "Notepad",  "path": "notepad" },
+    { "label": "Calculator", "path": "calc" },
+    { "label": "Documents", "path": "C:/Users/Public/Documents" },
+    { "label": "Intranet", "path": "https://example.internal/home" }
+  ],
+
+  "snippets": [
+    { "label": "Today",    "text": "{date}" },
+    { "label": "Email",    "text": "sam@example.com", "method": "type" },
+    { "label": "Sign-off", "text": "Kind regards,\nSam" }
+  ]
+}</code></pre>
+</figure>
+
+<h2 id="writer">2. A writer's desk</h2>
+
+<p>Two apps that each get their own strip of the panel, plus a set of snippets that are always
+there. The mail and document groups are pinned to the <em>same</em> rectangle: they belong to
+different profiles, so only one is ever drawn and they can't collide.</p>
+
+<p><strong>Shows:</strong> a coarse 8&times;8 grid, two profiles sharing one rectangle, an
+always-visible section below them, <code>{date}</code>/<code>{time}</code>/<code>{clipboard}</code>,
+multi-line snippets, tile colours, and <code>span</code>.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  // Eight rows is coarse to place but comfortable to read: every group here is
+  // four rows tall, which is two rows of tiles with room to spare.
+  "layout": { "columns": 8, "rows": 8 },
+
+  "profiles": [
+    { "label": "Mail",   "match": [ "OUTLOOK", "olk", "thunderbird" ] },
+    { "label": "Writer", "match": [ "WINWORD", "soffice", "notepad" ] }
+  ],
+
+  "sections": [
+    {
+      "label": "Apps",
+      "columns": "1-2", "rows": "1-8",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Mail",      "path": "outlook" },
+        { "label": "Documents", "path": "C:/Users/Public/Documents" },
+        { "label": "Notes",     "path": "notepad", "args": "C:/temp/notes.txt" },
+        { "label": "Style guide", "path": "https://wiki.example.com/style" }
+      ]
+    },
+
+    // These two share columns 3-8, rows 1-4. That's safe precisely because
+    // they belong to different profiles — only one can be on screen at a time.
+    {
+      "label": "Mail",
+      "profiles": [ "Mail" ],
+      "columns": "3-8", "rows": "1-4",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Greeting",  "text": "Hi,\n\n" },
+        { "label": "Sign-off",  "text": "Kind regards,\nSam" },
+        { "label": "Address",   "text": "sam@example.com", "method": "type" },
+        { "label": "Will read", "text": "Thanks for sending this over — I'll read it properly and come back to you." },
+        { "label": "Free tomorrow", "text": "I'm free any time tomorrow afternoon if a quick call would help.", "span": 2 }
+      ]
+    },
+    {
+      "label": "Writing",
+      "profiles": [ "Writer" ],
+      "columns": "3-8", "rows": "1-4",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Heading rule", "text": "\n---\n\n" },
+        { "label": "Quote clip",   "text": "> {clipboard}\n\n", "color": "#7fb069" },
+        { "label": "Placeholder",  "text": "[TK: check this]", "method": "type" },
+        { "label": "Byline",       "text": "By Sam Okafor — {date}" }
+      ]
+    },
+
+    // No "profiles", so this one is always on screen, under whichever of the
+    // two above is showing.
+    {
+      "label": "Anywhere",
+      "columns": "3-8", "rows": "5-8",
+      "tilesPerRow": 3,
+      "snippets": [
+        { "label": "Date",  "text": "{date}", "color": "#4a8fe0" },
+        { "label": "Time",  "text": "{time}", "color": "#4a8fe0" },
+        { "label": "Stamp", "text": "{date} {time} — ", "color": "#4a8fe0" },
+        { "label": "Em dash", "text": " — ", "method": "type" },
+        { "label": "Ellipsis", "text": "…", "method": "type" },
+        { "label": "Bullet",  "text": "\n• ", "method": "type" }
+      ]
+    }
+  ]
+}</code></pre>
+</figure>
+
+<h2 id="developer">3. A developer's panel</h2>
+
+<p>A left rail of apps, a middle strip that changes with the focused window, and a
+self-maintaining list of projects down the right — generated from a directory, not written out
+by hand.</p>
+
+<p><strong>Shows:</strong> four profiles, editor snippet expansion via <code>keys</code>,
+terminal snippets with <code>"method": "type"</code> and <code>"keys": "enter"</code>, a
+<code>source</code> section with a <code>&#9662;</code> command list, and a URL tile pinned to
+one browser.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "layout": { "columns": 12, "rows": 12 },
+
+  "profiles": [
+    { "label": "Editor",   "match": [ "Code", "devenv", "rider64" ] },
+    { "label": "Terminal", "match": [ "WindowsTerminal", "powershell", "pwsh", "cmd" ] },
+    { "label": "Browser",  "match": [ "chrome", "msedge", "firefox" ] },
+    { "label": "Notes",    "match": [ "notepad", "obsidian" ] }
+  ],
+
+  "sections": [
+    {
+      "label": "Apps",
+      "columns": "1-2", "rows": "1-12",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Editor",   "path": "code", "color": "#4a8fe0" },
+        { "label": "Terminal", "path": "wt", "windows": [ "WindowsTerminal" ] },
+        { "label": "Browser",  "path": "chrome" },
+        { "label": "Projects", "path": "D:/Projects" },
+        { "label": "Logs",     "path": "D:/Projects/_logs" },
+        // Runs elevated on purpose — the one tile that should.
+        { "label": "Services", "path": "services.msc", "deElevate": false }
+      ]
+    },
+
+    {
+      "label": "Editor",
+      "profiles": [ "Editor" ],
+      "columns": "3-7", "rows": "1-6",
+      "tilesPerRow": 2,
+      "snippets": [
+        // Type the prefix, dismiss the suggestion list, then let the editor
+        // expand its own snippet — which is how a template gets placeholders.
+        { "label": "Log line",  "text": "log",   "method": "type", "keys": "escape tab" },
+        { "label": "Component", "text": "rafce", "method": "type", "keys": "escape tab" },
+        { "label": "Test case", "text": "test",  "method": "type", "keys": "escape tab" },
+        { "label": "TODO",      "text": "// TODO ({date}): ", "method": "type" },
+        { "label": "Region",    "text": "// ---- ", "method": "type", "span": 2 }
+      ]
+    },
+
+    {
+      "label": "Terminal",
+      "profiles": [ "Terminal" ],
+      "columns": "3-7", "rows": "7-12",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Status",  "text": "git status", "method": "type", "keys": "enter" },
+        { "label": "Log",     "text": "git log --oneline -20", "method": "type", "keys": "enter" },
+        { "label": "Diff",    "text": "git diff --stat", "method": "type", "keys": "enter" },
+        { "label": "Build",   "text": "npm run build", "method": "type", "keys": "enter" },
+        // No "keys": left at the prompt for a branch name.
+        { "label": "Switch",  "text": "git switch ", "method": "type" },
+        { "label": "Commit",  "text": "git commit -m \"\"", "method": "type" }
+      ]
+    },
+
+    {
+      "label": "Links",
+      "profiles": [ "Browser" ],
+      "columns": "3-7", "rows": "1-6",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Repo",     "path": "https://git.example.com/team" },
+        { "label": "CI",       "path": "https://ci.example.com/pipelines" },
+        { "label": "Local app", "path": "http://localhost:5173" },
+        { "label": "Test login", "path": "https://app.example.com/login",
+          "browser": "msedge", "args": "--inprivate" }
+      ]
+    },
+
+    // One tile per directory under D:/Projects, newest-used first. The main tap
+    // changes directory; the ▾ holds the four things done next.
+    {
+      "label": "Projects",
+      "profiles": [ "Terminal" ],
+      "columns": "8-12", "rows": "1-12",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "D:/Projects",
+        "exclude": [ "_logs", "_archive", "node_modules" ],
+        "command": "cd \"{dir}\"",
+        "submit": true,
+        "commands": [
+          { "label": "Editor",  "command": "code \"{dir}\"" },
+          { "label": "Install", "command": "npm --prefix \"{dir}\" install" },
+          { "label": "Dev",     "command": "npm --prefix \"{dir}\" run dev" },
+          { "label": "Tests",   "command": "npm --prefix \"{dir}\" test" }
+        ],
+        "commandColumns": 2,
+        "max": 20
+      }
+    },
+
+    // Same folders, but for when an editor is focused instead of a terminal:
+    // no command at all, so tapping opens the folder in Explorer. Labelled
+    // differently from the section above on purpose — see the note below.
+    {
+      "label": "Project folders",
+      "profiles": [ "Editor", "Notes", "Browser" ],
+      "columns": "8-12", "rows": "7-12",
+      "tilesPerRow": 2,
+      "source": {
+        "folders": "D:/Projects",
+        "exclude": [ "_logs", "_archive", "node_modules" ],
+        "max": 12
+      }
+    }
+  ]
+}</code></pre>
+</figure>
+
+<div class="note">
+  <span class="note-title">Two sources over one directory</span>
+  <p>Nothing stops several sections scanning the same folder — each gets its own scan. Here one
+  types into a terminal and one opens folders in Explorer, and which you get depends on what
+  you were doing when you reached for the panel.</p>
+  <p>They're given <em>different labels</em> deliberately: which side of a
+  <code>&#8646;</code> switch a section is showing is remembered against its label, so two
+  source sections sharing one label also share their switch side.</p>
+</div>
+
+<h2 id="support">4. A support desk</h2>
+
+<p>Canned replies for the mail client, portal links for the browser, and a folder of open
+cases with a human-readable title under each — read from a file some other script keeps
+up to date.</p>
+
+<p><strong>Shows:</strong> <code>split</code> with a capture group feeding <code>{id}</code>,
+<code>matchLabel</code>/<code>otherLabel</code>, <code>subtitles</code>, an always-visible
+source with no <code>command</code>, and <code>allowedHosts</code> left empty.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "layout": { "columns": 12, "rows": 10 },
+
+  "profiles": [
+    { "label": "Mail",    "match": [ "OUTLOOK", "olk" ] },
+    { "label": "Browser", "match": [ "chrome", "msedge", "firefox" ] }
+  ],
+
+  "sections": [
+    {
+      "label": "Apps",
+      "columns": "1-3", "rows": "1-10",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Mail",     "path": "outlook" },
+        { "label": "Cases",    "path": "D:/Cases" },
+        { "label": "Portal",   "path": "https://support.example.com/queue" },
+        { "label": "Knowledge base", "path": "https://wiki.example.com/support" },
+        { "label": "Phone tool", "path": "https://calls.example.com" }
+      ]
+    },
+
+    {
+      "label": "Replies",
+      "profiles": [ "Mail" ],
+      "columns": "4-8", "rows": "1-10",
+      "tilesPerRow": 1,
+      "snippets": [
+        { "label": "Acknowledge", "text": "Thanks for getting in touch — I've picked this up and I'll come back to you today.", "color": "#7fb069" },
+        { "label": "Need details", "text": "To dig into this I'll need:\n\n- what you were doing when it happened\n- the exact wording of any error\n- roughly what time it was\n\nThanks!" },
+        { "label": "Escalating",  "text": "I'm passing this to the team who own that area and will keep you posted.", "color": "#e0a458" },
+        { "label": "Fixed",       "text": "This should be working again now — could you confirm at your end?", "color": "#7fb069" },
+        { "label": "Closing",     "text": "I'll close this off for now. Reply any time to reopen it." },
+        { "label": "Ref + date",  "text": "Ref {clipboard} — {date}", "method": "type" }
+      ]
+    },
+
+    {
+      "label": "Portals",
+      "profiles": [ "Browser" ],
+      "columns": "4-8", "rows": "1-10",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Queue",     "path": "https://support.example.com/queue" },
+        { "label": "New case",  "path": "https://support.example.com/new" },
+        { "label": "Status page", "path": "https://status.example.com", "browser": "default" },
+        { "label": "Admin console", "path": "https://admin.example.com",
+          "browser": "msedge", "args": "--inprivate" }
+      ]
+    },
+
+    // Always on screen: one tile per case folder. No "command", so tapping one
+    // opens it in Explorer — and the wide side prefers an Explorer window that
+    // already names that folder.
+    {
+      "label": "Cases",
+      "columns": "9-12", "rows": "1-10",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "D:/Cases",
+        "exclude": [ "_closed", "_templates" ],
+
+        // Folders like "case-10482-acme" go on the "Open cases" side, with
+        // 10482 captured as {id} — which is also the key the subtitles use.
+        "split": "^case-(\\d+)",
+        "matchLabel": "Open cases",
+        "otherLabel": "Everything else",
+
+        "subtitles": "D:/Cases/_titles.txt",
+        "max": 30
+      }
+    }
+  ]
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>D:\Cases\_titles.txt — anything that can write "key|text" lines can fill this in</figcaption>
+<pre><code>10482|Acme — login loop after update
+10517|Northwind — export times out
+10533|Contoso — printer mapping</code></pre>
+</figure>
+
+<h2 id="launcher">5. A folder launcher</h2>
+
+<p>No profiles, no typing, nothing conditional: three lists of folders that keep themselves up
+to date, for a machine where the job is mostly "open the right folder". Good on a shared
+workstation, and the whole file is short enough to read in one go.</p>
+
+<p><strong>Shows:</strong> a small grid, several sources over different roots,
+<code>%USERPROFILE%</code> expansion, a section with <code>columns</code> omitted so its tiles
+flow instead of snapping, and <code>tilesPerRow</code> on a wide group.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "layout": { "columns": 9, "rows": 8 },
+
+  "sections": [
+    {
+      "label": "Shoots",
+      "columns": "1-3", "rows": "1-8",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "E:/Shoots",
+        "split": "^(\\d{4})",
+        "matchLabel": "This year on",
+        "otherLabel": "Older",
+        "max": 25
+      }
+    },
+
+    {
+      "label": "Exports",
+      "columns": "4-6", "rows": "1-8",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "E:/Exports",
+        "exclude": [ "_temp" ],
+        "max": 25
+      }
+    },
+
+    {
+      "label": "My documents",
+      "columns": "7-9", "rows": "1-6",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "%USERPROFILE%/Documents",
+        "max": 15
+      }
+    },
+
+    // No "columns": this section is full width and its tiles size themselves
+    // and flow, rather than snapping to a tile grid. It lands in the first gap
+    // that fits — the strip left under "My documents".
+    {
+      "label": "",
+      "apps": [
+        { "label": "This PC",   "path": "explorer" },
+        { "label": "Downloads", "path": "%USERPROFILE%/Downloads" },
+        { "label": "Recycle bin", "path": "explorer", "args": "shell:RecycleBinFolder" }
+      ]
+    }
+  ]
+}</code></pre>
+</figure>
+
+<h2 id="local">A local overlay for any of them</h2>
+
+<p>Whichever of the above you start from, anything machine-specific belongs in a
+<code>dashboard.local.json</code> beside it rather than in the file itself. Keys here win,
+objects merge a level at a time, and a list replaces the shared one outright.</p>
+
+<figure class="code">
+<figcaption>dashboard.local.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  // This machine serves the panel to a tablet; the shared file ships with it off.
+  "remote": { "enabled": true },
+
+  // A coarser grid on this smaller screen. "layout" is an object, so this
+  // merges — "columns" from the shared file survives.
+  "layout": { "rows": 8 }
+}</code></pre>
+</figure>
+
+<div class="pager">
+  <a href="configuration.html">
+    <span>Previous</span>
+    <strong>&larr; Configuration reference</strong>
+  </a>
+  <a class="next" href="tablet.html">
+    <span>Next</span>
+    <strong>Tablet remote &rarr;</strong>
+  </a>
+</div>
+
+<footer>
+  <p>Every path, label, address and command on this page is invented. Replace them with
+  your own before wondering why <code>D:/Projects</code> is empty.</p>
+</footer>
+
+</div>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>

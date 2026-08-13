@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- No zoom: this is a control surface, and a pinch mid-tap is a mis-tap. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1e1e1e">
+<title>Deckhand</title>
+
+<!--
+    Installed to the home screen, this stops being a page in a browser and becomes the
+    dashboard: its own icon, no address bar, and the whole screen given to the tiles.
+    The manifest is what Android installs from; the apple- tags are the same thing for
+    an iPad, which has its own way of asking and predates the manifest.
+
+    black-translucent puts the status bar over the page rather than above it, which only
+    works because the body is already padded by env(safe-area-inset-*) for Android's
+    navigation bar - see the padding on body below.
+-->
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<style>
+  :root {
+    --bg: #1e1e1e; --group: #252526; --tile: #2d2d30;
+    --line: #3f3f46; --text: #eaeaea; --dim: #8a8a8a; --accent: #007acc;
+
+    /*
+      How tall the page may be. NOT 100vh: on a tablet that's the height with the
+      browser's bars retracted, so a page sized to it runs on underneath them — and
+      since the grid layout doesn't scroll, the bottom row of tiles is simply lost.
+      dvh is the current height including whatever bars are showing, and the script
+      below replaces this with the visible height outright where it can measure it.
+    */
+    --viewport: 100vh;
+  }
+  @supports (height: 100dvh) { :root { --viewport: 100dvh; } }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: var(--bg); color: var(--text);
+    font: 16px/1.3 "Segoe UI", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  header {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; color: var(--dim); font-size: 13px;
+  }
+  #context { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #link { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); flex: none; }
+  #link.live { background: #2ea043; }
+  #link.lost { background: #d1242f; }
+  #awake { flex: none; white-space: nowrap; }
+  #awake.weak { color: #6a6a70; }
+  #awake.none { color: #f0d68a; }
+  /*
+    The pilot light: see the script. It has to be a size the browser counts as on
+    screen, so it can't be hidden — but it plays the same grey as the header, which
+    leaves nothing to look at.
+  */
+  #pilot { width: 8px; height: 8px; flex: none; pointer-events: none; }
+
+  #banner {
+    display: none; margin: 0 10px 8px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px;
+    background: #3a2d00; color: #f0d68a; font-size: 14px;
+  }
+  #banner.show { display: block; }
+
+  main { padding: 0 6px 12px; }
+  .group {
+    background: var(--group); border: 1px solid var(--line); border-radius: 10px;
+    margin: 0 4px 10px; padding: 4px 6px 8px;
+    /* The header stays put and the tiles scroll under it, as in the panel. */
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+  }
+  .group > h2 {
+    margin: 6px 6px 8px; font-size: 12px; font-weight: 600;
+    letter-spacing: .04em; color: var(--dim); text-transform: uppercase;
+    flex: none;
+  }
+  .tiles { display: grid; gap: 8px; min-height: 0; }
+  /*
+    One cell holding a tile and the narrow button that trails it — a branch label and its
+    ▾. The arrow is a fixed width rather than a share of the row, which is what the panel
+    gives it: a share would be a fat arrow on a wide group and a sliver on a narrow one.
+  */
+  .pair { display: flex; gap: 8px; min-width: 0; }
+  .pair > button { flex: 1 1 auto; min-width: 0; }
+  .pair > button + button { flex: 0 0 44px; padding: 10px 0; }
+  /*
+    An app tile: the same two buttons, drawn as one control split by a line. No gap, one
+    rounded outline around the pair, and the divider is the left half's right border —
+    which is also how the panel does it, so both screens read the same.
+  */
+  .pair.joined { gap: 0; }
+  .pair.joined > button:first-child { border-radius: 8px 0 0 8px; }
+  .pair.joined > button + button {
+    border-radius: 0 8px 8px 0; border-left: none; margin-left: 0;
+  }
+
+  /*
+    Wide enough to be worth it — a tablet in either orientation — and the page becomes
+    the panel: the same grid, the same rectangles, each group scrolling its own tiles.
+    Narrower than this, twelve columns would make tiles too small to hit, so the groups
+    stack full-width instead and the page scrolls as a whole.
+  */
+  @media (min-width: 600px) {
+    body { height: var(--viewport); display: flex; flex-direction: column; overflow: hidden; }
+    /* The token box is the one thing here an on-screen keyboard competes with, and the
+       keyboard shrinks --viewport. Let it scroll rather than clipping the button. */
+    #gate:not([hidden]) { flex: 1; min-height: 0; overflow-y: auto; }
+    /* The grid lives two levels down, so the height has to be handed through #panel
+       as well or `flex: 1` on main has nothing to stretch against. :not([hidden])
+       keeps this from overriding the attribute that hides it behind the token box. */
+    #panel:not([hidden]) { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    main {
+      flex: 1; min-height: 0; display: grid;
+      /* Set per snapshot: repeat(columns, 1fr) / repeat(rows, 1fr). */
+    }
+    .group { margin: 4px; overflow: hidden; }
+    .group > .tiles { overflow-y: auto; overscroll-behavior: contain; }
+  }
+
+  button {
+    min-height: 60px; padding: 10px 12px;
+    background: var(--tile); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px;
+    font: inherit; text-align: center; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  button:active { background: var(--accent); border-color: var(--accent); }
+  button.ok { animation: ok .5s ease-out; }
+  button.bad { animation: bad .5s ease-out; }
+  @keyframes ok { from { background: #2ea043; border-color: #2ea043; } }
+  @keyframes bad { from { background: #d1242f; border-color: #d1242f; } }
+
+  #gate { padding: 40px 24px; max-width: 420px; margin: 0 auto; }
+  #gate p { color: var(--dim); font-size: 14px; }
+  #gate input {
+    width: 100%; margin: 12px 0; padding: 14px;
+    background: var(--tile); color: var(--text);
+    border: 1px solid var(--line); border-radius: 8px; font: inherit;
+  }
+  #gate button { width: 100%; }
+  #toast {
+    /* Fixed position ignores the padding on body, so the inset is needed again here or
+       the reason a tap was refused sits behind the navigation bar. */
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    max-width: 90vw; padding: 10px 16px; border-radius: 8px;
+    background: #3a1d1d; border: 1px solid #d1242f; color: #ffd7d7;
+    font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /*
+    The picker, mirroring the layer the panel puts over itself. Fixed and covering
+    everything, so the tiles behind it can't be tapped — which matches the laptop, where
+    the panel is covered, and the server, which refuses a tap for anything but this card.
+    The backdrop is itself the dismiss.
+  */
+  #modal {
+    position: fixed; inset: 0; z-index: 20;
+    display: flex; align-items: center; justify-content: center;
+    background: #141416d8; padding: 16px;
+  }
+  #modal[hidden] { display: none; }
+  #modalCard {
+    background: var(--group); border: 1px solid var(--line); border-radius: 12px;
+    padding: 8px; width: min(560px, 100%); max-height: 100%;
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  #modalTitle {
+    margin: 6px 8px 8px; font-size: 12px; font-weight: 600;
+    letter-spacing: .04em; color: var(--dim); text-transform: uppercase;
+  }
+  #modalList { display: grid; gap: 8px; overflow-y: auto; overscroll-behavior: contain; }
+  /* A grid so the way out is the width of the card, as it is on the panel. */
+  #modalFoot { display: grid; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div id="gate" hidden>
+  <h1 style="font-size:20px;margin:0">Deckhand</h1>
+  <p>Enter the token from the laptop — the status window shows it, beside <b>Copy</b>.
+     It's kept on this device only.</p>
+  <input id="token" type="password" inputmode="text" autocomplete="off"
+         autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="token">
+  <button id="enter">Connect</button>
+  <!-- Why the last attempt failed. Without this a rejected token just returns here,
+       which looks like the page is broken rather than the token being wrong. -->
+  <p id="gateError" style="color:#ff9d9d" hidden></p>
+</div>
+
+<div id="panel" hidden>
+  <header>
+    <span id="link"></span>
+    <span id="context">connecting…</span>
+    <!-- Whether the screen is being held on, and by which of the two ways. Touch it
+         for the long version. -->
+    <span id="awake"></span>
+    <video id="pilot" muted playsinline disablepictureinpicture aria-hidden="true"></video>
+    <span id="forget" style="cursor:pointer">forget token</span>
+  </header>
+  <div id="banner"></div>
+  <main id="groups"></main>
+</div>
+
+<!--
+    The window picker, mirroring the layer the panel puts over itself. Its contents come
+    from the snapshot like the tiles do, so a choice made here raises the same window a
+    finger on the laptop would.
+-->
+<div id="modal" hidden>
+  <div id="modalCard">
+    <div id="modalTitle"></div>
+    <div id="modalList"></div>
+    <div id="modalFoot"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+
+// ---- how much screen there actually is ----------------------------------
+
+// visualViewport is the part of the page you can currently see: bars showing or hidden,
+// keyboard up or down. Measuring it beats any unit, because it's the browser's own
+// answer rather than a guess about which bars are counted. Where it's missing the dvh
+// in the stylesheet stands.
+const seen = window.visualViewport;
+if (seen) {
+  const measure = () =>
+    document.documentElement.style.setProperty("--viewport", `${Math.round(seen.height)}px`);
+  seen.addEventListener("resize", measure);
+  // Retracting a toolbar by scrolling changes the height without a resize on some
+  // browsers, and rotating fires neither on others.
+  seen.addEventListener("scroll", measure);
+  window.addEventListener("orientationchange", () => setTimeout(measure, 250));
+  measure();
+}
+
+const KEY = "deckhand.token";
+const gate = document.getElementById("gate");
+const panel = document.getElementById("panel");
+const groupsEl = document.getElementById("groups");
+const contextEl = document.getElementById("context");
+const linkEl = document.getElementById("link");
+const bannerEl = document.getElementById("banner");
+const toastEl = document.getElementById("toast");
+const modalEl = document.getElementById("modal");
+const modalTitleEl = document.getElementById("modalTitle");
+const modalListEl = document.getElementById("modalList");
+const modalFootEl = document.getElementById("modalFoot");
+const awakeEl = document.getElementById("awake");
+const pilotEl = document.getElementById("pilot");
+
+let token = localStorage.getItem(KEY);
+let revision = 0;
+
+/*
+  This device's own name for itself, made once and kept: the laptop pins the session to
+  it, so being the paired tablet survives a new DHCP lease, a different Wi-Fi, or a
+  tunnel that gives every client one address. Sent with every request.
+*/
+const DEVICE_KEY = "deckhand.device";
+let device = localStorage.getItem(DEVICE_KEY);
+if (!device) {
+  device = crypto.randomUUID
+    ? crypto.randomUUID()
+    : Array.from(crypto.getRandomValues(new Uint8Array(16)),
+                 (b) => b.toString(16).padStart(2, "0")).join("");
+  localStorage.setItem(DEVICE_KEY, device);
+}
+
+// Which build of this page the laptop is serving, as of the first snapshot seen. The two
+// are designed together, so a page still open from before a rebuild draws new snapshots
+// with old code — which looks like a fault in the panel rather than a stale tab.
+let build = "";
+let reloading = false;
+
+// Set only when replacing this page didn't take, and shown in the banner: an installed
+// copy has no address bar to reload from, so if the page can't do it by itself it has to
+// say so rather than quietly drawing the wrong thing.
+let stuck = "";
+
+// Why the laptop is refusing this device, when it is: paired with another one, or too many
+// wrong tokens tried here. Cleared by the first request that gets through.
+let blocked = "";
+
+// The panel being unlocked over there, as of the last snapshot.
+let unlocked = "";
+
+/** The picker's Cancel, so the backdrop can dismiss through the button the panel shows. */
+let dismissId = "";
+
+const gateErrorEl = document.getElementById("gateError");
+
+function show(which) {
+  gate.hidden = which !== "gate";
+  panel.hidden = which !== "panel";
+}
+
+function fail(message) {
+  gateErrorEl.textContent = message;
+  gateErrorEl.hidden = !message;
+}
+
+/*
+  The one place the banner is decided. Three different things can want it and they don't
+  arrive together — being out of date is noticed while drawing, being refused while
+  fetching, the panel being unlocked comes in a snapshot — so each sets its own variable
+  and this orders them by how little the page can do about it. Being out of date outranks
+  the rest: it's the one this page can't recover from by itself.
+*/
+function banner() {
+  const trouble = stuck || blocked || unlocked;
+  bannerEl.classList.toggle("show", trouble !== "");
+  bannerEl.textContent = trouble;
+}
+
+function toast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.add("show");
+  setTimeout(() => toastEl.classList.remove("show"), 2600);
+}
+
+// ---- keeping the screen on ----------------------------------------------
+
+// A dashboard you have to wake up first is a dashboard with an extra tap on every
+// tile, so the page asks to keep the screen on for as long as it's the page you're
+// looking at — and says which of the two ways is holding it, because they aren't
+// equally sure.
+let lock = null;          // a real screen wake lock, where the browser grants one
+let pilotPlaying = false; // the video standing in for it, where it doesn't
+let pilotPainter = null;
+// Told to the laptop on every request, so its window and log can say so too. Empty
+// until it's actually known: "none" is a claim that the screen will sleep, and sending
+// it before the first attempt has finished would put a warning in the log that turns
+// out to be untrue a second later.
+let screenState = "";
+
+function sayScreen(state, text, why) {
+  screenState = state;
+  awakeEl.textContent = text;
+  awakeEl.title = why;
+  awakeEl.className = state === "lock" ? "" : state === "video" ? "weak" : "none";
+}
+
+async function keepAwake() {
+  // The proper lever. The browser releases it by itself whenever the page is hidden,
+  // which is why this runs again on the way back rather than only once.
+  let refused = false;
+  if (navigator.wakeLock && !lock) {
+    try {
+      lock = await navigator.wakeLock.request("screen");
+      lock.addEventListener("release", () => { lock = null; });
+      stopPilot(); // it was only standing in until this worked
+      sayScreen("lock", "awake", "The browser is holding the screen on for as long as this page is in front.");
+      return;
+    } catch (error) {
+      // Refused: a battery saver, device policy, or the page not being what's on
+      // screen at this instant. The video is what's left, and a later attempt may
+      // still be granted.
+      refused = true;
+    }
+  }
+  if (lock) return;
+  startPilot(refused);
+}
+
+// navigator.wakeLock only exists on a secure page, and the tablet reaches the laptop
+// over plain http, so on the tablet this is the one that runs. A playing video is the
+// older lever: a browser that keeps the screen on for a film keeps it on for this one.
+// Less certain than a wake lock, hence its own wording.
+function startPilot(refused) {
+  if (pilotPlaying) return;
+
+  if (!pilotEl.srcObject) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 16;
+    const paint = canvas.getContext("2d");
+    if (!canvas.captureStream || !paint) {
+      sayScreen("none", "may sleep", "This browser won't let a page keep the screen on. Set the tablet's screen timeout instead.");
+      return;
+    }
+    // A frame a second: enough to count as playing, too little to cost anything.
+    const frame = () => {
+      paint.fillStyle = getComputedStyle(document.body).backgroundColor;
+      paint.fillRect(0, 0, canvas.width, canvas.height);
+    };
+    frame();
+    pilotEl.srcObject = canvas.captureStream(1);
+    pilotPainter = setInterval(frame, 1000);
+  }
+
+  pilotEl.play().then(() => {
+    pilotPlaying = true;
+    sayScreen("video", "awake (best effort)",
+      (refused
+        ? "The browser turned down a screen wake lock, so the screen is being held on by a silent video instead."
+        : "A screen wake lock needs an https page and this one is plain http, so the screen is being held on by a silent video instead.")
+      + " If the tablet still sleeps, set its screen timeout.");
+  }).catch(() => {
+    sayScreen("none", "may sleep", "This browser wouldn't play the video that keeps the screen on. Set the tablet's screen timeout instead.");
+  });
+}
+
+function stopPilot() {
+  if (pilotPlaying) { pilotEl.pause(); pilotPlaying = false; }
+  if (pilotPainter !== null) { clearInterval(pilotPainter); pilotPainter = null; }
+}
+
+// Stop holding it: the page is no longer what you're looking at, or is back at the
+// token box, and a screen held on by a page you've left is a flat battery.
+function letSleep() {
+  if (lock) { lock.release().catch(() => {}); lock = null; }
+  stopPilot();
+  sayScreen("", "", "");
+}
+
+// ---- talking to the laptop ----------------------------------------------
+
+async function api(path, options = {}) {
+  const headers = Object.assign(
+    { "X-Dashboard-Token": token, "X-Dashboard-Screen": screenState,
+      "X-Dashboard-Device": device },
+    options.headers || {});
+  const response = await fetch(path, Object.assign({}, options, { headers, cache: "no-store" }));
+  if (response.status === 401) {
+    // The token changed on the laptop, or was never right. Say which, rather than
+    // dropping back to the box as though nothing had happened.
+    const why = await response.text().catch(() => "");
+    localStorage.removeItem(KEY);
+    token = null;
+    stop();
+    letSleep();
+    fail(why || "that token was rejected");
+    show("gate");
+    throw new Error("unauthorized");
+  }
+
+  // Refused, not unauthenticated: this device isn't the one the laptop is paired with, or
+  // too many wrong tokens have been tried here. Neither is fixed by asking for the token
+  // again — the box would hand back the same one — so the page repeats what the laptop
+  // said and keeps polling, which is what lets it recover by itself the moment ↻ is
+  // tapped over there.
+  if (response.status === 403 || response.status === 429) {
+    blocked = await response.text().catch(() => "") || "the laptop refused this device";
+    banner();
+    throw new Error("refused");
+  }
+
+  if (blocked) { blocked = ""; banner(); }
+  return response;
+}
+
+// ---- staying up to date -------------------------------------------------
+
+/*
+  Installed to a home screen, this page can go weeks without being closed and has no
+  address bar to reload from, while the laptop app behind it gets rebuilt. So the laptop
+  fingerprints what it's serving — the page, the worker and the manifest together — and
+  sends that with every snapshot. A page whose own fingerprint no longer matches replaces
+  itself.
+
+  The check is on the snapshot rather than a timer because the snapshot is the thing that
+  goes wrong: the page and the protocol are one design, and the moment they disagree is
+  the moment there's something to fix.
+*/
+
+/** True if this page is being replaced, so there's no point drawing the snapshot. */
+function outdated(serving) {
+  if (!build) { build = serving; return false; }
+  if (!serving || serving === build) return false;
+  if (reloading) return true;
+
+  // Reloaded once for this same build already and still running it: something is holding
+  // on to the old page harder than `no-store` should allow. Better to say so and go on
+  // drawing — a panel one build behind still launches things — than to reload for ever.
+  if (remembered(RELOADED) === build) {
+    stuck = "The laptop app was rebuilt and this page couldn't replace itself. "
+            + "Close it and open it again.";
+    return false;
+  }
+  remembered(RELOADED, build);
+
+  reloading = true;
+  replace();
+  return true;
+}
+
+const RELOADED = "deckhand.reloaded";
+
+/** Reads, and optionally writes, something that should survive a reload but not a relaunch. */
+function remembered(key, value) {
+  try {
+    const was = sessionStorage.getItem(key);
+    if (value !== undefined) sessionStorage.setItem(key, value);
+    return was;
+  } catch (error) {
+    return null; // storage refused; the guard above simply doesn't apply
+  }
+}
+
+async function replace() {
+  // The worker is asked to re-check itself first. Its script carries the same fingerprint,
+  // so a new build means new bytes there too — and without this the reload below could be
+  // answered out of the shell the worker already has.
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) await registration.update();
+  } catch (error) {
+    // No worker, or it wouldn't update. The reload is still worth doing.
+  }
+  location.reload();
+}
+
+/*
+  Registering the worker is what makes the page installable, and what lets an installed
+  copy open without waiting on the laptop. navigator.serviceWorker only exists on a secure
+  page — https, or localhost — and the tablet reaches the laptop over plain http, so on
+  that path this is skipped and everything else here works exactly as it did before.
+*/
+if ("serviceWorker" in navigator) {
+  // Whether one was already in charge when this page loaded. Taking over for the first
+  // time isn't an update, and reloading for it would mean a reload on every first visit.
+  let controlled = !!navigator.serviceWorker.controller;
+
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (controlled && !reloading) { reloading = true; location.reload(); }
+    controlled = true;
+  });
+
+  navigator.serviceWorker.register("/sw.js").catch(() => {
+    // Nothing to do about it: the panel doesn't need a worker to work, only to install.
+  });
+}
+
+// ---- drawing ------------------------------------------------------------
+
+function draw(snapshot) {
+  if (outdated(snapshot.page)) return;
+
+  revision = snapshot.revision;
+  contextEl.textContent = snapshot.context || "Deckhand";
+
+  unlocked = snapshot.ready ? ""
+    : "The panel is unlocked on the laptop, so taps do nothing until it's locked again.";
+  banner();
+
+  // The dashboard's own grid, so the tablet lays out where the panel does. The media
+  // query decides whether these placements are used at all: below 600px `main` isn't a
+  // grid and the groups just stack, which is what a phone-width screen wants.
+  groupsEl.style.gridTemplateColumns = `repeat(${snapshot.columns}, minmax(0, 1fr))`;
+  groupsEl.style.gridTemplateRows = `repeat(${snapshot.rows}, minmax(0, 1fr))`;
+
+  // How far each group had been scrolled. Every tap publishes a new panel and this
+  // redraws from scratch, so without carrying the scroll over, tapping a command in a
+  // branch halfway down the list would throw that list back to the top — away from the
+  // tile you just used and the ones next to it.
+  const scrolled = new Map();
+  for (const box of groupsEl.children) {
+    const list = box.querySelector(".tiles");
+    if (list && list.scrollTop > 0) scrolled.set(box.dataset.group, list.scrollTop);
+  }
+
+  groupsEl.textContent = "";
+  for (const group of snapshot.groups) {
+    const box = document.createElement("div");
+    box.className = "group";
+    box.dataset.group = group.label;
+    box.style.gridColumn = `${group.column} / span ${group.columnSpan}`;
+    box.style.gridRow = `${group.row} / span ${group.rowSpan}`;
+
+    if (group.label) {
+      const title = document.createElement("h2");
+      title.textContent = group.label;
+      box.append(title);
+    }
+
+    const tiles = document.createElement("div");
+    tiles.className = "tiles";
+    // Mirrors the panel's own tile grid, so the two views line up.
+    tiles.style.gridTemplateColumns = `repeat(${group.tileColumns}, minmax(0, 1fr))`;
+
+    let leader = null; // the tile last placed, which a trailing button joins
+    let pair = null;   // its cell, once one has
+
+    for (const tile of group.tiles) {
+      const button = document.createElement("button");
+      button.textContent = tile.label;
+      button.dataset.id = tile.id;
+
+      // The tile's accent, painted where the panel paints it — on the outline.
+      if (tile.color) button.style.borderColor = tile.color;
+
+      // Set in from its cell, as a branch's command list is on the panel.
+      if (tile.indent) button.style.marginLeft = `${tile.indent}px`;
+
+      // A branch tile's ▾ shares its label's cell. The wrapper appears only when one
+      // turns up, so an ordinary group stays a grid of plain buttons.
+      if (tile.trailing && leader) {
+        if (!pair) {
+          pair = document.createElement("div");
+          // "joined" is the app tile: one control split by a line rather than two
+          // buttons with a gap between them.
+          pair.className = tile.joined ? "pair joined" : "pair";
+          pair.style.gridRow = leader.style.gridRow;
+          pair.style.gridColumn = leader.style.gridColumn;
+          leader.replaceWith(pair);
+          pair.append(leader);
+        }
+        pair.append(button);
+        continue;
+      }
+
+      // Every other tile is placed rather than flowed: the panel's rows aren't all one
+      // tile wide, and auto-placement can only read a full row as the next row down.
+      button.style.gridRow = tile.row;
+      button.style.gridColumn = `${tile.column} / span ${tile.span}`;
+      tiles.append(button);
+      leader = button;
+      pair = null;
+    }
+
+    box.append(tiles);
+    groupsEl.append(box);
+
+    // After the append, so there is something to scroll; a list that shrank clamps itself.
+    const was = scrolled.get(group.label);
+    if (was) tiles.scrollTop = was;
+  }
+
+  drawModal(snapshot.overlay);
+}
+
+// The window picker. Whether it's up is the panel's decision, not this page's — it is
+// published like everything else, so opening it with a finger on the laptop opens it here
+// too. While it's up the layer covers the tiles behind it, and the laptop refuses a tap
+// for any of them in any case.
+function drawModal(overlay) {
+  modalListEl.textContent = "";
+  modalFootEl.textContent = "";
+
+  if (!overlay) {
+    dismissId = "";
+    modalEl.hidden = true;
+    return;
+  }
+
+  dismissId = overlay.dismiss || "";
+  modalTitleEl.textContent = overlay.title || "";
+  modalListEl.style.gridTemplateColumns = `repeat(${overlay.columns}, minmax(0, 1fr))`;
+
+  for (const tile of overlay.tiles) {
+    const button = document.createElement("button");
+    button.textContent = tile.label;
+    button.dataset.id = tile.id;
+
+    // The way out goes under the list rather than at the end of it, so a long list can't
+    // scroll the only deliberate way to close the thing off the card.
+    if (tile.id === dismissId) {
+      modalFootEl.append(button);
+      continue;
+    }
+
+    button.style.gridRow = tile.row;
+    button.style.gridColumn = `${tile.column} / span ${tile.span}`;
+    modalListEl.append(button);
+  }
+
+  modalEl.hidden = false;
+}
+
+// ---- tapping ------------------------------------------------------------
+
+// Tapping the tiles, and tapping the picker over them: the same request either way, since
+// the card's choices are tiles the panel published like any other.
+groupsEl.addEventListener("click", (event) => onTap(event.target.closest("button")));
+
+modalEl.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  // A tap that missed the card landed on the backdrop, and dismissing is what a backdrop
+  // is for. It goes through the Cancel button the panel is showing, so the laptop closes
+  // the picker for the same reason it would have anyway.
+  if (button) onTap(button);
+  else if (event.target === modalEl && dismissId) onTap(null, dismissId);
+});
+
+async function onTap(button, id = button && button.dataset.id) {
+  if (!id) return;
+
+  const flash = (kind) => {
+    if (!button) return;
+    button.classList.remove("ok", "bad");
+    void button.offsetWidth; // restart the animation even on a repeat tap
+    button.classList.add(kind);
+  };
+
+  try {
+    // Long enough for the laptop's own 5s "panel busy" answer to arrive; short enough
+    // that a tap into a dead socket fails while the finger still remembers tapping.
+    const response = await api("/api/tap", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+      signal: AbortSignal.timeout?.(8000),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (response.ok) {
+      flash("ok");
+      // A control surface you don't look at benefits from an answer you can feel.
+      if (navigator.vibrate) navigator.vibrate(30);
+      poll(); // an expander tap changes what's on screen — pick it up at once
+    } else {
+      flash("bad");
+      toast(result.message || `couldn't do that (${response.status})`);
+      poll();
+    }
+  } catch (error) {
+    // "refused" already put the laptop's own reason in the banner, and it isn't going to
+    // change between taps — a toast saying nothing answered would be untrue as well as
+    // repetitive.
+    if (error.message === "unauthorized" || error.message === "refused") return;
+    flash("bad");
+    toast("no answer from the laptop");
+  }
+}
+
+// ---- polling ------------------------------------------------------------
+
+/*
+  Long polls, not a timer: the laptop holds a request that finds nothing new open until
+  the panel next changes (or ~25s pass), so a change lands here the moment it happens
+  and the radio wakes for one response instead of twenty that all said 204. The pump
+  below just keeps one request parked over there for as long as the page is on screen.
+*/
+
+// Whether a poll is already on the wire — a tap's "pick it up at once" poll must not
+// stack a second request behind the parked one.
+let polling = false;
+
+// The abort handle for the parked request, so stop() can cut it loose instead of
+// leaving a fetch against a page that's gone to the background.
+let pollAbort = null;
+
+/** One request. True if it was answered — false is a reason for the pump to back off. */
+async function poll() {
+  if (polling) return true;
+  polling = true;
+  pollAbort = "AbortController" in window ? new AbortController() : null;
+  // Over the laptop's 25s hold, so a healthy parked request is never the thing cut off;
+  // a dead socket still turns the dot red on the next pass.
+  const cutoff = pollAbort ? setTimeout(() => pollAbort.abort(), 35000) : null;
+  try {
+    // Which build this page is, as well as how much of the panel it has seen: the laptop
+    // only answers "nothing new" when both still hold, so reconnecting to a rebuilt app
+    // can't be mistaken for nothing having happened.
+    const response = await api(`/api/tiles?since=${revision}&page=${build}`, {
+      signal: pollAbort && pollAbort.signal,
+    });
+    linkEl.className = "live";
+    if (response.status !== 204) draw(await response.json());
+    return true;
+  } catch (error) {
+    // "unauthorized" tore the session down already; "refused" is in the banner. Either
+    // way the pump backs off rather than hammering.
+    if (error.message !== "unauthorized") linkEl.className = "lost";
+    return false;
+  } finally {
+    if (cutoff) clearTimeout(cutoff);
+    pollAbort = null;
+    polling = false;
+  }
+}
+
+// Bumping this is what ends a running pump: each one checks it still owns the loop
+// after every await, so stop() is a number change rather than a handle to keep.
+let pumpGeneration = 0;
+
+async function pump() {
+  const mine = ++pumpGeneration;
+  while (mine === pumpGeneration && token) {
+    const answered = await poll();
+    if (mine !== pumpGeneration) return;
+    // An answered request turns straight around — the pause is only so a laptop
+    // answering instantly (rebuild loops, errors) can't spin this flat out. A failed
+    // one waits properly before knocking again.
+    await sleep(answered ? 150 : 3000);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function start() {
+  show("panel");
+  stop();
+  keepAwake();
+  pump();
+}
+
+function stop() {
+  pumpGeneration++;
+  if (pollAbort) pollAbort.abort();
+}
+
+document.getElementById("enter").addEventListener("click", () => {
+  const value = document.getElementById("token").value.trim();
+  if (!value) return;
+  fail("");
+  token = value;
+  localStorage.setItem(KEY, value);
+  revision = 0;
+  start();
+});
+
+document.getElementById("token").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") document.getElementById("enter").click();
+});
+
+document.getElementById("forget").addEventListener("click", () => {
+  localStorage.removeItem(KEY);
+  token = null;
+  stop();
+  letSleep();
+  show("gate");
+});
+
+// Tablets suspend timers in a background tab; catch up on the way back rather than
+// showing a panel that's minutes stale.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { stop(); letSleep(); }
+  else if (token) start();
+});
+
+/*
+  A token can arrive in the fragment — the QR on the laptop folds it in while Show has
+  it revealed, so scanning is the whole setup. A fragment never leaves the browser (it
+  isn't sent with any request), and it's stored and scrubbed from the bar at once, so
+  the address on screen and in history is clean of it.
+*/
+if (location.hash.startsWith("#token=")) {
+  const given = decodeURIComponent(location.hash.slice(7)).trim();
+  if (given) {
+    token = given;
+    localStorage.setItem(KEY, given);
+    revision = 0;
+  }
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
+if (token) start(); else show("gate");
+</script>
+</body>
+</html>

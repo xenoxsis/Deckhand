@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configuration reference — Deckhand</title>
+<meta name="description" content="Every key in dashboard.json: layout, profiles, sections, app tiles, snippet tiles, folder sources, remote.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="shell">
+
+<nav class="side" aria-label="Documentation">
+  <a class="brand" href="index.html"><span class="brand-mark">&#9698;</span>Deckhand <span class="brand-sub">docs</span></a>
+  <ul class="nav">
+    <li><a href="index.html">Getting started</a></li>
+    <li><a href="configuration.html" aria-current="page">Configuration reference</a></li>
+    <li><a href="examples.html">Example configs</a></li>
+    <li><a href="tablet.html">Tablet remote</a></li>
+  </ul>
+  <p class="nav-label">On this page</p>
+  <ul class="nav toc" id="toc"></ul>
+  <button class="theme" id="theme" type="button">&#9689; Theme</button>
+</nav>
+
+<main id="main">
+<div class="wrap">
+
+<h1>Configuration reference</h1>
+<p class="lede">Every key the dashboard reads, what it defaults to, and a small example of
+each. All the examples here are made up — they don't come from anyone's real panel — so they
+can be copied and edited without leaving someone else's paths behind.</p>
+
+<h2 id="top-level">The top level</h2>
+
+<p>The file is a single JSON object. Every key in it is optional; a
+<code>dashboard.json</code> containing <code>{}</code> starts an empty panel.</p>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Key</th><th>Type</th><th>What it's for</th></tr></thead>
+  <tbody>
+    <tr><td><a href="#schema"><code>$schema</code></a></td><td>string</td><td>Points an editor at the schema for completion and typo squiggles.</td></tr>
+    <tr><td><a href="#layout"><code>layout</code></a></td><td>object</td><td>How many columns and rows the panel is divided into.</td></tr>
+    <tr><td><a href="#profiles"><code>profiles</code></a></td><td>array</td><td>Names for the apps worth recognising.</td></tr>
+    <tr><td><a href="#sections"><code>sections</code></a></td><td>array</td><td>Every group of tiles, and where it sits.</td></tr>
+    <tr><td><a href="#shorthand"><code>apps</code></a></td><td>array</td><td>Shorthand for one always-visible "Apps" section.</td></tr>
+    <tr><td><a href="#shorthand"><code>snippets</code></a></td><td>array</td><td>Shorthand for one always-visible "Snippets" section.</td></tr>
+    <tr><td><a href="#browsers"><code>browsers</code></a></td><td>array</td><td>Which processes count as a browser, for URL tiles.</td></tr>
+    <tr><td><a href="#remote"><code>remote</code></a></td><td>object</td><td>Serving the panel to a tablet.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="schema">$schema</h3>
+
+<p>Not a setting — a pointer for your editor. With it, VS Code (and anything else that reads
+JSON Schema) completes key names as you type them and underlines the ones that don't exist.
+The dashboard skips this key when it checks for typos, so it never reports itself.</p>
+
+<figure class="code">
+<pre><code class="lang-json">{ "$schema": "./dashboard.schema.json" }</code></pre>
+</figure>
+
+<h2 id="layout">layout</h2>
+
+<p>The panel is a fixed grid, and sections are placed on it by number. There is no size
+here: the grid is proportional, and the panel's actual size comes from dragging it.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">layout.columns</span>
+      <span class="key-type">integer &ge; 1</span>
+      <span class="badge def">12</span>
+    </div>
+    <p>How many columns the width is divided into.</p>
+  </div>
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">layout.rows</span>
+      <span class="key-type">integer &ge; 1</span>
+      <span class="badge def">12</span>
+    </div>
+    <p>How many rows the height is divided into. Rows share the height equally, which is what
+    gives every group a size fixed by the grid rather than by how many tiles are in it.</p>
+  </div>
+</div>
+
+<figure class="code">
+<pre><code class="lang-json">"layout": { "columns": 12, "rows": 12 }</code></pre>
+</figure>
+
+<div class="note warn">
+  <span class="note-title">Rows are the sharper trade-off</span>
+  <p>Tiles have a minimum height, so a fine row grid buys placement precision at the cost of
+  the smallest useful group. At 12 rows on a 620pt-tall panel a row is about 45pt — less than
+  a tile — so a one-row group scrolls from its very first tile. Budget roughly <strong>2 rows
+  per tile row</strong> you want visible, or use fewer rows (3&ndash;4) for groups that are
+  comfortable but coarse to place.</p>
+</div>
+
+<h2 id="sections">sections</h2>
+
+<p>A section is a bordered, titled group occupying a rectangle of the grid. This is where
+every tile lives.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">label</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>The group's heading, drawn in small capitals. An empty label draws no heading at all,
+    which is what you want for a group whose tiles speak for themselves.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">profiles</span>
+      <span class="key-type">array of strings</span>
+      <span class="badge def">[] — always visible</span>
+    </div>
+    <p>The <a href="#profiles">profile</a> labels this section belongs to. It is on screen
+    while one of them is the focused app's profile, and nowhere else. Omit it for a section
+    that is always shown.</p>
+    <p>This is the whole of what makes a group conditional, and it's written on the section
+    rather than in the profile so that everything about a group — what its tiles do, where it
+    sits, and when it appears — is in one place.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">columns</span>
+      <span class="key-type">integer or "from-to"</span>
+      <span class="badge def">full width, flowing tiles</span>
+    </div>
+    <p>See <a href="#ranges">grid ranges</a> below. A plain number is a width to be packed
+    somewhere; a string like <code>"1-3"</code> pins the section to those columns.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">rows</span>
+      <span class="key-type">integer or "from-to"</span>
+      <span class="badge def">1 row</span>
+    </div>
+    <p>The same two forms on the other axis.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">tilesPerRow</span>
+      <span class="key-type">integer 1&ndash;24</span>
+      <span class="badge def">the section's width in columns</span>
+    </div>
+    <p>How many tiles fit across the group before wrapping. A 4-column section fits four
+    1-column tiles by default; <code>"tilesPerRow": 1</code> makes a tall narrow list, which
+    is what wide labels want.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">apps</span>
+      <span class="key-type">array of <a href="#app-tiles">app tiles</a></span>
+    </div>
+    <p>Tiles that launch or raise something.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">snippets</span>
+      <span class="key-type">array of <a href="#snippet-tiles">snippet tiles</a></span>
+    </div>
+    <p>Tiles that type text into the focused window. Snippets are drawn after apps when a
+    section has both.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">source</span>
+      <span class="key-type"><a href="#source">source object</a></span>
+    </div>
+    <p>Generates one tile per subdirectory of a folder, ahead of any <code>apps</code> and
+    <code>snippets</code> in the same section.</p>
+  </div>
+</div>
+
+<h3 id="ranges">Grid ranges: pinned or packed</h3>
+
+<p><code>columns</code> and <code>rows</code> each take one of two forms, and the difference
+is the whole placement model:</p>
+
+<ul>
+  <li><strong>A pinned range</strong> — <code>"columns": "1-3"</code> — means those tracks,
+    1-based, wherever everything else ends up. Pinning is what keeps a group in the same
+    place as sections come and go with the focused app.</li>
+  <li><strong>A width</strong> — <code>"columns": 3</code> — means "three wide, wherever it
+    fits". Those sections are packed into the first free gap, scanning left to right and top
+    to bottom.</li>
+</ul>
+
+<p>Pinned and packed sections mix freely; the packed ones flow around the pinned ones. A few
+details worth knowing:</p>
+
+<ul>
+  <li><code>"1:3"</code> is accepted as well as <code>"1-3"</code>.</li>
+  <li><code>"3-1"</code> is read as <code>"1-3"</code> — a slip, not an error.</li>
+  <li>A range that overhangs the grid keeps its start and loses the overhang, rather than
+    sliding back to fit.</li>
+  <li>Omitting <code>columns</code> does two things: the section is full width, <em>and</em>
+    its tiles size themselves and flow instead of snapping to a tile grid.</li>
+  <li>If pinned sections leave a packed one nowhere to go, rows are appended beyond
+    <code>layout.rows</code>. Every row gets a little shorter rather than a group falling off
+    the bottom.</li>
+</ul>
+
+<figure class="figure">
+<svg viewBox="0 0 720 372" role="img" aria-label="A 12 by 12 grid with four sections: Apps pinned to columns 1 to 3 and all rows, Editor at columns 4 to 8 rows 1 to 6, Terminal at columns 4 to 8 rows 7 to 12, Projects at columns 9 to 12 and all rows.">
+  <g class="svg-line" stroke-width="1" opacity="0.35">
+    <line x1="40" y1="30" x2="40" y2="342"/><line x1="95" y1="30" x2="95" y2="342"/>
+    <line x1="150" y1="30" x2="150" y2="342"/><line x1="205" y1="30" x2="205" y2="342"/>
+    <line x1="260" y1="30" x2="260" y2="342"/><line x1="315" y1="30" x2="315" y2="342"/>
+    <line x1="370" y1="30" x2="370" y2="342"/><line x1="425" y1="30" x2="425" y2="342"/>
+    <line x1="480" y1="30" x2="480" y2="342"/><line x1="535" y1="30" x2="535" y2="342"/>
+    <line x1="590" y1="30" x2="590" y2="342"/><line x1="645" y1="30" x2="645" y2="342"/>
+    <line x1="700" y1="30" x2="700" y2="342"/>
+    <line x1="40" y1="30" x2="700" y2="30"/><line x1="40" y1="56" x2="700" y2="56"/>
+    <line x1="40" y1="82" x2="700" y2="82"/><line x1="40" y1="108" x2="700" y2="108"/>
+    <line x1="40" y1="134" x2="700" y2="134"/><line x1="40" y1="160" x2="700" y2="160"/>
+    <line x1="40" y1="186" x2="700" y2="186"/><line x1="40" y1="212" x2="700" y2="212"/>
+    <line x1="40" y1="238" x2="700" y2="238"/><line x1="40" y1="264" x2="700" y2="264"/>
+    <line x1="40" y1="290" x2="700" y2="290"/><line x1="40" y1="316" x2="700" y2="316"/>
+    <line x1="40" y1="342" x2="700" y2="342"/>
+  </g>
+  <g class="svg-label">
+    <text x="40" y="20">col 1</text><text x="205" y="20">4</text>
+    <text x="480" y="20">9</text><text x="686" y="20">12</text>
+    <text x="10" y="35">1</text><text x="10" y="191">7</text><text x="4" y="346">12</text>
+  </g>
+  <g class="svg-accent" stroke-width="1.5" fill-opacity="0.55">
+    <rect x="43" y="33" width="159" height="306" rx="6"/>
+    <rect x="208" y="33" width="269" height="150" rx="6"/>
+    <rect x="208" y="189" width="269" height="150" rx="6"/>
+    <rect x="483" y="33" width="214" height="306" rx="6"/>
+  </g>
+  <g class="svg-label-strong" text-anchor="middle">
+    <text x="122" y="180">Apps</text>
+    <text x="342" y="102">Editor</text>
+    <text x="342" y="258">Terminal</text>
+    <text x="590" y="180">Projects</text>
+  </g>
+  <g class="svg-label" text-anchor="middle">
+    <text x="122" y="198">"1-3", "1-12"</text>
+    <text x="342" y="120">"4-8", "1-6"</text>
+    <text x="342" y="276">"4-8", "7-12"</text>
+    <text x="590" y="198">"9-12", "1-12"</text>
+  </g>
+</svg>
+<figcaption>A four-section layout on the default 12&times;12 grid. Editor and Terminal share
+columns but not rows, so both can be on screen together. Two sections written for
+<em>different</em> profiles can safely share the same rectangle — only one is ever drawn.</figcaption>
+</figure>
+
+<div class="note warn">
+  <span class="note-title">Overlaps are honoured, not resolved</span>
+  <p>Two sections pinned on both axes keep the rectangles they were given even where those
+  rectangles intersect — moving one would second-guess a config that was explicit. They then
+  draw on top of each other, and the group underneath shows through around the edges. That
+  reads as a bug in the wrong group: a scrollbar a hand's width from the tiles it belongs to
+  looks like it belongs to the small group covering them.</p>
+</div>
+
+<h3 id="scrolling">Group size and scrolling</h3>
+
+<p>A group's size comes from the grid, not from how many tiles are in it. Configure more
+tiles than fit and the group grows a vertical scrollbar — drag it with a finger — rather than
+stretching and pushing the rest of the layout around.</p>
+
+<h3 id="shorthand">The apps and snippets shorthand</h3>
+
+<p>Top-level <code>apps</code> and <code>snippets</code> lists each become one
+always-visible section, labelled "Apps" and "Snippets", with no placement of their own. It's
+the short way in; anything beyond a first config wants real sections.</p>
+
+<figure class="code">
+<pre><code class="lang-json">{
+  "apps":     [ { "label": "Calculator", "path": "calc" } ],
+  "snippets": [ { "label": "Today", "text": "{date}" } ]
+}</code></pre>
+</figure>
+
+<h2 id="profiles">profiles</h2>
+
+<p>A profile is a name for an app and how to recognise it. That is <em>all</em> it is: a
+profile holds no tiles and no placement. It answers "what is the focused window", and every
+section naming it appears while that's the answer.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">label</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>The name sections refer to, and what the panel's top-left strip shows while this
+    profile is active. Matched case-insensitively.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">match</span>
+      <span class="key-type">array of strings</span>
+    </div>
+    <p>Process names that activate this profile, with or without <code>.exe</code>, matched
+    case-insensitively — what Task Manager's <em>Details</em> tab shows in its Name column.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">titleMatch</span>
+      <span class="key-type">regex</span>
+      <span class="badge def">none — any title</span>
+    </div>
+    <p>An optional regex the window title must <em>also</em> match. This is how one app is
+    split into several profiles: one editor profile for windows whose title names a
+    particular project, another for the rest.</p>
+  </div>
+</div>
+
+<figure class="code">
+<pre><code class="lang-json">"profiles": [
+  // Specific first: this one only claims editor windows for one project.
+  { "label": "Editor (docs)", "match": [ "Code" ], "titleMatch": "handbook" },
+  { "label": "Editor",        "match": [ "Code", "devenv" ] },
+  { "label": "Mail",          "match": [ "OUTLOOK", "thunderbird" ] },
+  { "label": "Browser",       "match": [ "chrome", "msedge", "firefox" ] },
+  { "label": "Terminal",      "match": [ "WindowsTerminal", "powershell", "pwsh", "cmd" ] }
+]</code></pre>
+</figure>
+
+<div class="note">
+  <span class="note-title">First match wins, so order most-specific first</span>
+  <p>A profile with a <code>titleMatch</code> can <em>decline</em> a window, leaving a later
+  profile for the same process reachable — which is the only way to split one app in two. A
+  profile with no <code>titleMatch</code> claims its processes outright, so anything below it
+  for the same process can never be reached, and <code>--check</code> says so.</p>
+  <p>A <code>titleMatch</code> that doesn't compile matches <em>nothing</em> rather than
+  everything: matching everything would be broader than what was asked for and would shadow
+  every profile below it for as long as the typo lasted.</p>
+</div>
+
+<h2 id="app-tiles">App tiles</h2>
+
+<p>An app tile is one control with two sides, divided by a line. The wide side goes to a
+window the program already has — asking which, when there's more than one — and the narrow
+<code>+</code> starts another copy. Both sides are always there.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">label</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>The tile's text.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">path</span>
+      <span class="key-type">string</span>
+      <span class="badge req">required</span>
+    </div>
+    <p>One of three things, and the dashboard tells them apart on its own:</p>
+    <ul>
+      <li><strong>A program</strong> — a full path, or a bare name that's on <code>PATH</code>
+        (<code>"notepad"</code>, <code>"code"</code>).</li>
+      <li><strong>A folder</strong> — opens in Explorer.</li>
+      <li><strong>An <code>http(s)</code> URL</strong> — opens as a tab rather than launching
+        anything. See <a href="#url-tiles">URL tiles</a>.</li>
+    </ul>
+    <p>Forward slashes are fine and avoid escaping every backslash.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">args</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>Command line for the program, passed as written. On a URL tile these are browser
+    switches instead (<code>--incognito</code>, Firefox's <code>-private-window</code>), and
+    they only apply when a <code>browser</code> is actually named.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">browser</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>URL tiles only. Omit for the browser you're currently looking at;
+    <code>"default"</code> to always use the system default; a process name like
+    <code>"msedge"</code> to pin the tile to one browser.</p>
+  </div>
+
+  <div class="key" id="app-deelevate">
+    <div class="key-head">
+      <span class="key-name">deElevate</span>
+      <span class="key-type">boolean</span>
+      <span class="badge def">true</span>
+    </div>
+    <p>Launch at normal user integrity instead of inheriting the dashboard's administrator.
+    On by default, and you almost always want that: the dashboard is only elevated so its
+    keystrokes can reach elevated windows, and an editor that silently inherits administrator
+    leaves root-owned files behind in your working copies.</p>
+    <p>Set it <code>false</code> on the rare tile that should genuinely run elevated.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">windows</span>
+      <span class="key-type">array of strings</span>
+      <span class="badge def">the program in <code>path</code></span>
+    </div>
+    <p>Which processes' windows the wide side goes to. The default is right until the thing
+    you launch isn't the thing that ends up on screen — a launcher that starts something else
+    and exits owns no windows by the time you look.</p>
+    <p><code>git-bash.exe</code> (starts a <code>mintty</code>), <code>git-cmd.exe</code> and
+    <code>wt.exe</code> (starts <code>WindowsTerminal</code>) are handled already. Anything
+    else that starts a fresh copy when its windows are plainly open wants this set.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">span</span>
+      <span class="key-type">integer &ge; 1</span>
+      <span class="badge def">1</span>
+    </div>
+    <p>How many of the section's tile columns this tile occupies. Clamped to
+    <code>tilesPerRow</code>.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">color</span>
+      <span class="key-type">"#RGB" or "#RRGGBB"</span>
+    </div>
+    <p>An accent on the tile's outline, on the panel and the tablet alike. On a wall of
+    identical tiles a colour is faster to hit than a label is to read.</p>
+    <p>Longer WPF forms like <code>#AARRGGBB</code> are deliberately refused: a browser reads
+    eight digits as RGBA, so the two screens would disagree about what was written.</p>
+  </div>
+</div>
+
+<figure class="code">
+<figcaption>A section of app tiles</figcaption>
+<pre><code class="lang-json">{
+  "label": "Apps",
+  "columns": "1-3", "rows": "1-12",
+  "tilesPerRow": 1,
+  "apps": [
+    { "label": "Editor", "path": "code", "color": "#4a8fe0" },
+
+    // A folder: opens in Explorer, and the wide side prefers an Explorer
+    // window whose title already names this folder.
+    { "label": "Reports", "path": "D:/Work/Reports" },
+
+    // A launcher that starts something else and exits.
+    { "label": "Shell", "path": "C:/Program Files/Git/git-bash.exe",
+      "windows": [ "mintty" ], "deElevate": false },
+
+    // Arguments are passed as written.
+    { "label": "Scratch", "path": "notepad", "args": "C:/temp/scratch.txt" },
+
+    // Two columns wide, in a section that fits three across.
+    { "label": "Task manager", "path": "taskmgr", "deElevate": false, "span": 2 }
+  ]
+}</code></pre>
+</figure>
+
+<h3 id="url-tiles">URL tiles and the browser you're looking at</h3>
+
+<p>Handing a URL to Windows opens it in the <em>default</em> browser, which is the wrong one
+whenever the browser in front of you isn't the default — the tab appears in a window you
+aren't looking at. So when the focused process is one of the <a href="#browsers">browsers</a>,
+the URL goes to that browser's own exe with the URL as an argument, which every mainstream
+browser turns into a tab in its running instance.</p>
+
+<p>A URL has no window of its own to go back to, so <em>both</em> sides of the tile open the
+page. Add <code>"windows": [ "msedge" ]</code> to have the wide side raise that browser
+instead.</p>
+
+<figure class="code">
+<pre><code class="lang-json">"apps": [
+  // Opens in whichever browser you're using.
+  { "label": "Wiki", "path": "https://wiki.example.com" },
+
+  // Always this browser, always a private window.
+  { "label": "Test login", "path": "https://app.example.com/login",
+    "browser": "msedge", "args": "--inprivate" },
+
+  // Always the system default browser, whatever is focused.
+  { "label": "Status page", "path": "https://status.example.com", "browser": "default" }
+]</code></pre>
+</figure>
+
+<h2 id="snippet-tiles">Snippet tiles</h2>
+
+<p>A snippet tile drops text at the caret of whatever window is focused. Because the panel
+never takes focus, "whatever window is focused" is the one you were just typing in.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">label</span>
+      <span class="key-type">string</span>
+    </div>
+    <p>The tile's text.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">text</span>
+      <span class="key-type">string</span>
+      <span class="badge req">required</span>
+    </div>
+    <p>What gets inserted. <code>\n</code> is a newline, and it arrives as a real Enter — so
+    an editor's auto-indent applies to each line as it lands, which is usually what you want
+    and occasionally not. <a href="#placeholders">Placeholders</a> are resolved at the moment
+    of the tap.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">method</span>
+      <span class="key-type">"paste" | "type"</span>
+      <span class="badge def">"paste"</span>
+    </div>
+    <p><strong>paste</strong> puts the text on the clipboard, sends Ctrl+V, then restores what
+    was there before. Best for anything long or multi-line.</p>
+    <p><strong>type</strong> synthesizes the characters one at a time. Slower, but it never
+    touches the clipboard and it works in the windows that don't map Ctrl+V to paste —
+    terminal emulators being the usual example, where a paste would put a control character
+    in the prompt instead.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">keys</span>
+      <span class="key-type">"tab" | "enter" | "escape", space- or comma-separated</span>
+    </div>
+    <p>Keys pressed after the text lands, in the order written. Two uses: <code>"enter"</code>
+    to run a command you just typed into a shell, and <code>"escape tab"</code> to hand the
+    rest of the job to your editor's own snippet expansion.</p>
+    <p>That second one is the way to a tile that fills in a <em>template</em> rather than a
+    fixed string: inserted text can't select any part of itself, but an editor expanding its
+    own snippet can. Anything else is ignored with a warning in the log.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">span</span>
+      <span class="key-type">integer &ge; 1</span>
+      <span class="badge def">1</span>
+    </div>
+    <p>As on an app tile.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">color</span>
+      <span class="key-type">"#RGB" or "#RRGGBB"</span>
+    </div>
+    <p>As on an app tile.</p>
+  </div>
+</div>
+
+<figure class="code">
+<figcaption>A section of snippet tiles, tied to a profile</figcaption>
+<pre><code class="lang-json">{
+  "label": "Mail",
+  "profiles": [ "Mail" ],
+  "columns": "4-8", "rows": "1-6",
+  "tilesPerRow": 2,
+  "snippets": [
+    { "label": "Greeting", "text": "Hi,\n\n" },
+    { "label": "Sign-off", "text": "Kind regards,\nSam" },
+
+    // "type" leaves the clipboard alone — handy for short strings.
+    { "label": "My address", "text": "sam@example.com", "method": "type" },
+
+    { "label": "Chase", "text": "Just following up on the below — any news?" },
+
+    // Resolved when tapped, not when written.
+    { "label": "Stamp", "text": "Noted {date} {time}", "color": "#c07ad0" }
+  ]
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>Snippets for a terminal and an editor</figcaption>
+<pre><code class="lang-json">// A terminal that doesn't take Ctrl+V wants "type"; "enter" runs the line.
+{
+  "label": "Git",
+  "profiles": [ "Terminal" ],
+  "columns": "4-8", "rows": "7-12",
+  "tilesPerRow": 2,
+  "snippets": [
+    { "label": "Status", "text": "git status", "method": "type", "keys": "enter" },
+    { "label": "Log",    "text": "git log --oneline -20", "method": "type", "keys": "enter" },
+
+    // No "keys": the line is left incomplete, caret at the end, ready for a name.
+    { "label": "Checkout", "text": "git checkout ", "method": "type" }
+  ]
+},
+
+// Let the editor expand its own snippet: type the prefix, dismiss the
+// suggestion list, then press Tab.
+{
+  "label": "Editor",
+  "profiles": [ "Editor" ],
+  "columns": "4-8", "rows": "1-6",
+  "tilesPerRow": 1,
+  "snippets": [
+    { "label": "Log line",  "text": "log",   "method": "type", "keys": "escape tab" },
+    { "label": "Component", "text": "rafce", "method": "type", "keys": "escape tab" }
+  ]
+}</code></pre>
+</figure>
+
+<div class="note warn">
+  <span class="note-title">Editor snippet expansion has one prerequisite</span>
+  <p>VS Code needs <code>"editor.tabCompletion": "onlySnippets"</code> before Tab will expand
+  a typed prefix; at its default of <code>off</code> Tab just indents, which looks exactly
+  like the tile having done nothing. Send <code>escape tab</code> rather than
+  <code>tab</code>: typing the prefix opens the suggestion list, and a Tab aimed at that list
+  accepts whatever it happens to have highlighted.</p>
+</div>
+
+<h2 id="source">source — folder sections</h2>
+
+<p>A <code>source</code> fills its section with one tile per subdirectory of a folder you
+name, so a group of tiles maintains itself as directories come and go. What the tiles
+<em>do</em> is the <code>command</code> decision:</p>
+
+<ul>
+  <li><strong>With no <code>command</code></strong>, tapping opens the folder — exactly like
+    an app tile pointed at it, window matching included. A source with nothing but a
+    <code>folders</code> line is a self-maintaining launcher for a projects directory.</li>
+  <li><strong>With a <code>command</code></strong>, tapping types it into the focused window.
+    Give that section <code>profiles</code> naming the windows it types into: the same list
+    both shows the section and is re-checked at tap time, because focus can change between
+    the render and the tap and a command typed into an editor is junk.</li>
+</ul>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">folders</span>
+      <span class="key-type">string</span>
+      <span class="badge req">required</span>
+    </div>
+    <p>The directory whose subdirectories become tiles. <code>%VARIABLES%</code> are expanded,
+    so a path under the profile can be written without a user name in it.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">exclude</span>
+      <span class="key-type">array of strings</span>
+    </div>
+    <p>Directory names to leave out of the scan entirely, matched case-insensitively.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">split</span>
+      <span class="key-type">regex</span>
+      <span class="badge def">none — one flat list</span>
+    </div>
+    <p>Deals the folders onto the two sides of a <code>&#8646;</code> switch at the top of the
+    section: names it matches on one side, everything else on the other. Matched
+    case-insensitively, and its <strong>first capture group becomes
+    <code>{id}</code></strong> in the commands.</p>
+    <p>A pattern that doesn't compile matches nothing, so every folder lands on the "other"
+    side — and <code>--check</code> tells you why.</p>
+    <p>The switch is left out when the other side is empty, and which side you're on survives
+    both switching apps and a config reload. It's remembered against the section's
+    <code>label</code>, which is what lets it outlive a reload — so two source sections sharing
+    one label also share their switch side. Give them different labels if you don't want
+    that.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">matchLabel</span>
+      <span class="key-type">string</span>
+      <span class="badge def">"matching"</span>
+    </div>
+    <p>What the switch calls the folders <code>split</code> matched.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">otherLabel</span>
+      <span class="key-type">string</span>
+      <span class="badge def">"others"</span>
+    </div>
+    <p>What the switch calls the rest.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">command</span>
+      <span class="key-type">string</span>
+      <span class="badge def">none — tapping opens the folder</span>
+    </div>
+    <p>Typed into the focused window, with <a href="#placeholders">the folder placeholders</a>
+    substituted. Typed rather than pasted, since the usual target is a terminal.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">submit</span>
+      <span class="key-type">boolean</span>
+      <span class="badge def">true</span>
+    </div>
+    <p>Press Enter after typing, so the command runs rather than sitting at the prompt.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">commands</span>
+      <span class="key-type">array of {label, command}</span>
+      <span class="badge def">[] — no &#9662;</span>
+    </div>
+    <p>Extra commands reached by expanding a tile with its <code>&#9662;</code>, using the same
+    placeholders. Only one tile stays expanded at a time — leaving them all open would push
+    the rest of the panel off a group this tall.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">commandColumns</span>
+      <span class="key-type">integer 1&ndash;8</span>
+      <span class="badge def">2</span>
+    </div>
+    <p>How many columns the expanded command list is laid out in.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">max</span>
+      <span class="key-type">integer &ge; 1</span>
+      <span class="badge def">24</span>
+    </div>
+    <p>Cap on folder tiles. The section heading says when tiles were dropped
+    (<code>PROJECTS (24 of 61)</code>), so a short list is never quietly mistaken for the
+    whole list.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">subtitles</span>
+      <span class="key-type">string — a file or a glob</span>
+    </div>
+    <p>A file of <code>key|text</code> lines, one per line. A folder whose <code>{id}</code>
+    — or, failing that, whose name — appears as a key gets that text as a second line on its
+    tile. A glob like <code>"%USERPROFILE%/notes/titles_*"</code> is allowed so a script can
+    write dated files without coordinating with anyone; on a conflict the newest file wins.</p>
+    <p>The format is the entire contract. Anything that can write two fields around a pipe can
+    put subtitles on these tiles, and no file at all just means plain names.</p>
+  </div>
+</div>
+
+<figure class="code">
+<figcaption>The simplest useful source: a project launcher</figcaption>
+<pre><code class="lang-json">{
+  "label": "Projects",
+  "columns": "9-12", "rows": "1-12",
+  "tilesPerRow": 1,
+  "source": {
+    "folders": "D:/Projects",
+    "exclude": [ "_archive", "node_modules" ],
+    "max": 30
+  }
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>The same folders, as commands typed into a terminal</figcaption>
+<pre><code class="lang-json">{
+  "label": "Projects",
+  "profiles": [ "Terminal" ],
+  "columns": "9-12", "rows": "1-12",
+  "tilesPerRow": 1,
+  "source": {
+    "folders": "D:/Projects",
+    "exclude": [ "_archive" ],
+
+    // Folders named "2024-…" on one side of the switch, the rest on the other,
+    // with the year captured as {id}.
+    "split": "^(\\d{4})-",
+    "matchLabel": "By year",
+    "otherLabel": "Everything else",
+
+    // The main tap, and four more behind the tile's ▾.
+    "command": "cd \"{dir}\"",
+    "submit": true,
+    "commands": [
+      { "label": "Open editor", "command": "code \"{dir}\"" },
+      { "label": "Install",     "command": "npm --prefix \"{dir}\" install" },
+      { "label": "Dev server",  "command": "npm --prefix \"{dir}\" run dev" },
+      { "label": "Tests",       "command": "npm --prefix \"{dir}\" test" }
+    ],
+    "commandColumns": 2,
+    "max": 24,
+
+    // Optional second line per tile: "key|text", keyed by {id} or the folder name.
+    "subtitles": "%USERPROFILE%/notes/project-titles.txt"
+  }
+}</code></pre>
+</figure>
+
+<figure class="code">
+<figcaption>%USERPROFILE%\notes\project-titles.txt</figcaption>
+<pre><code>2024|Last year's work
+website-redesign|Marketing site, phase 2
+invoice-tool|Finance's invoice importer</code></pre>
+</figure>
+
+<h3 id="ordering">How folder tiles are ordered</h3>
+
+<p>Most recently used first, then by the folder's own change time. "Used" means tapped: every
+tap on a folder tile is recorded in <code>%USERPROFILE%\.deckhand_history</code>, and
+the scan reads it back.</p>
+
+<p>That record has to be the dashboard's own, because a folder's timestamp only moves when its
+<em>direct</em> children change — a project you edit deep inside every day can look untouched
+for months. So the order starts out by change time and learns from use. The file is one
+<code>seconds&#9251;path</code> line per tap, compacted once it grows; deleting it just resets
+the ordering.</p>
+
+<h2 id="placeholders">Placeholder reference</h2>
+
+<p>All of these are resolved at the moment of the tap, not when the config was written.</p>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Placeholder</th><th>Where</th><th>Becomes</th></tr></thead>
+  <tbody>
+    <tr><td><code>{date}</code></td><td>snippet <code>text</code></td><td>The local short date.</td></tr>
+    <tr><td><code>{time}</code></td><td>snippet <code>text</code></td><td>The local short time.</td></tr>
+    <tr><td><code>{clipboard}</code></td><td>snippet <code>text</code></td><td>Whatever text is on the clipboard — empty when what's there isn't text.</td></tr>
+    <tr><td><code>{name}</code></td><td>source <code>command</code></td><td>The folder's name.</td></tr>
+    <tr><td><code>{id}</code></td><td>source <code>command</code></td><td>The first capture group of <code>split</code>; empty when nothing was captured.</td></tr>
+    <tr><td><code>{dir}</code></td><td>source <code>command</code></td><td>The folder's full path, with Windows separators.</td></tr>
+    <tr><td><code>{branch}</code>, <code>{wi}</code></td><td>source <code>command</code></td><td>Older aliases for <code>{name}</code> and <code>{id}</code>, kept so existing configs keep working.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="note-title">A snippet that pastes what you copied</span>
+  <p><code>{clipboard}</code> is most useful for wrapping: <code>"text": "`{clipboard}`"</code>
+  puts backticks around whatever you just copied, <code>"text": "&gt; {clipboard}"</code> quotes
+  it. With <code>"method": "paste"</code> the clipboard is read, used, and then restored.</p>
+</div>
+
+<h2 id="browsers">browsers</h2>
+
+<p>Which process names count as a browser, for the "open this URL in the browser I'm actually
+looking at" behaviour. The default list already covers the mainstream ones, so this is only
+worth setting to add something unusual.</p>
+
+<figure class="code">
+<pre><code class="lang-json">"browsers": [ "chrome", "msedge", "firefox", "brave", "vivaldi", "opera", "opera_gx" ]</code></pre>
+</figure>
+
+<h2 id="remote">remote</h2>
+
+<p>Serving the panel to a tablet's browser. The short version is here; the whole story,
+including what stops it being a remote shell, is on the
+<a href="tablet.html">Tablet remote</a> page.</p>
+
+<div class="keys">
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">remote.enabled</span>
+      <span class="key-type">boolean</span>
+      <span class="badge def">false</span>
+    </div>
+    <p>Whether startup <em>asks</em> "laptop or tablet?". With it false nothing listens, no
+    port is opened and the token is never read. It's the natural thing to put in
+    <code>dashboard.local.json</code>: whether a machine offers its panel to the network is
+    that machine's business.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">remote.listen</span>
+      <span class="key-type">string</span>
+      <span class="badge def">"http://+:8787/"</span>
+    </div>
+    <p>The prefix to serve on. <code>+</code> means every interface; narrow it to one address
+    to keep it off the others, or to <code>http://127.0.0.1:8787/</code> when you're reaching
+    it through a tunnel.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">remote.tokenFile</span>
+      <span class="key-type">string</span>
+      <span class="badge def">%USERPROFILE%\.deckhand_token</span>
+    </div>
+    <p>Where the token really lives: one line, nothing else. Outside the project, so copying
+    the code somewhere doesn't copy the key with it.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">remote.token</span>
+      <span class="key-type">string, 16+ characters</span>
+    </div>
+    <p>The token itself — and the one key here that should <strong>not</strong> be written in
+    <code>dashboard.json</code>, because that file travels with the project. Use
+    <code>tokenFile</code>, which wins over this whenever it has anything in it.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">remote.allowedHosts</span>
+      <span class="key-type">array of strings</span>
+    </div>
+    <p>Names — not addresses — the panel may be reached by: a Tailscale name, a tunnel's
+    hostname. Addresses need no permission; a name does, because what a name points at isn't
+    the dashboard's to decide.</p>
+  </div>
+</div>
+
+<figure class="code">
+<pre><code class="lang-json">"remote": {
+  "enabled": true,
+  "listen": "http://+:8787/",
+  "allowedHosts": [ "desk-laptop.tail1234.ts.net" ]
+}</code></pre>
+</figure>
+
+<h2 id="files">Files on disk</h2>
+
+<div class="table-scroll">
+<table>
+  <thead><tr><th>Path</th><th>What it holds</th></tr></thead>
+  <tbody>
+    <tr><td><code>dashboard.json</code></td><td>The shared config. Travels with the project.</td></tr>
+    <tr><td><code>dashboard.local.json</code></td><td>This machine's overrides, merged over the above. Doesn't travel.</td></tr>
+    <tr><td><code>dashboard.schema.json</code></td><td>The schema both files point at, for editor completion.</td></tr>
+    <tr><td><code>%USERPROFILE%\.deckhand_token</code></td><td>The remote token, one line.</td></tr>
+    <tr><td><code>%USERPROFILE%\.deckhand_history</code></td><td>Folder-tile taps, for ordering. Safe to delete.</td></tr>
+    <tr><td><code>%LOCALAPPDATA%\Deckhand\</code></td><td>Remembered window size and position.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="everything">Every key at once</h2>
+
+<p>One file using every setting on this page, for copying pieces out of. Nothing here is
+anyone's real panel — the paths and commands are invented.</p>
+
+<figure class="code">
+<figcaption>dashboard.json</figcaption>
+<pre><code class="lang-json">{
+  "$schema": "./dashboard.schema.json",
+
+  "layout": { "columns": 12, "rows": 12 },
+
+  "browsers": [ "chrome", "msedge", "firefox", "brave", "vivaldi", "opera", "opera_gx" ],
+
+  "remote": {
+    "enabled": false,
+    "listen": "http://+:8787/",
+    "allowedHosts": [],
+    "tokenFile": "%USERPROFILE%/.deckhand_token"
+  },
+
+  "profiles": [
+    { "label": "Editor",   "match": [ "Code", "devenv" ] },
+    { "label": "Mail",     "match": [ "OUTLOOK", "thunderbird" ] },
+    { "label": "Browser",  "match": [ "chrome", "msedge", "firefox" ] },
+    { "label": "Terminal", "match": [ "WindowsTerminal", "powershell", "pwsh", "cmd" ] }
+  ],
+
+  "sections": [
+    {
+      "label": "Apps",
+      "columns": "1-3", "rows": "1-12",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Editor",  "path": "code", "color": "#4a8fe0" },
+        { "label": "Mail",    "path": "outlook" },
+        { "label": "Reports", "path": "D:/Work/Reports" },
+        { "label": "Shell",   "path": "C:/Program Files/Git/git-bash.exe",
+          "windows": [ "mintty" ], "deElevate": false },
+        { "label": "Scratch", "path": "notepad", "args": "C:/temp/scratch.txt" }
+      ]
+    },
+
+    {
+      "label": "Editor",
+      "profiles": [ "Editor" ],
+      "columns": "4-8", "rows": "1-6",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Log line",  "text": "log",   "method": "type", "keys": "escape tab" },
+        { "label": "Component", "text": "rafce", "method": "type", "keys": "escape tab" },
+        { "label": "TODO", "text": "// TODO ({date}): ", "method": "type", "span": 2 }
+      ]
+    },
+
+    {
+      "label": "Git",
+      "profiles": [ "Terminal" ],
+      "columns": "4-8", "rows": "7-12",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Status", "text": "git status", "method": "type", "keys": "enter" },
+        { "label": "Log",    "text": "git log --oneline -20", "method": "type", "keys": "enter" }
+      ]
+    },
+
+    {
+      "label": "Mail",
+      "profiles": [ "Mail" ],
+      "columns": "4-8", "rows": "1-8",
+      "tilesPerRow": 2,
+      "snippets": [
+        { "label": "Greeting",  "text": "Hi,\n\n" },
+        { "label": "Sign-off",  "text": "Kind regards,\nSam" },
+        { "label": "Address",   "text": "sam@example.com", "method": "type" },
+        { "label": "Stamp",     "text": "Noted {date} {time}", "color": "#c07ad0" }
+      ]
+    },
+
+    {
+      "label": "Links",
+      "profiles": [ "Browser" ],
+      "columns": "4-8", "rows": "1-8",
+      "tilesPerRow": 1,
+      "apps": [
+        { "label": "Wiki",      "path": "https://wiki.example.com" },
+        { "label": "Dashboard", "path": "https://metrics.example.com", "browser": "default" },
+        { "label": "Test login", "path": "https://app.example.com/login",
+          "browser": "msedge", "args": "--inprivate" }
+      ]
+    },
+
+    {
+      "label": "Projects",
+      "profiles": [ "Terminal" ],
+      "columns": "9-12", "rows": "1-12",
+      "tilesPerRow": 1,
+      "source": {
+        "folders": "D:/Projects",
+        "exclude": [ "_archive", "node_modules" ],
+        "split": "^(\\d{4})-",
+        "matchLabel": "By year",
+        "otherLabel": "Everything else",
+        "command": "cd \"{dir}\"",
+        "submit": true,
+        "commands": [
+          { "label": "Open editor", "command": "code \"{dir}\"" },
+          { "label": "Dev server",  "command": "npm --prefix \"{dir}\" run dev" }
+        ],
+        "commandColumns": 2,
+        "max": 24,
+        "subtitles": "%USERPROFILE%/notes/project-titles.txt"
+      }
+    }
+  ]
+}</code></pre>
+</figure>
+
+<div class="pager">
+  <a href="index.html">
+    <span>Previous</span>
+    <strong>&larr; Getting started</strong>
+  </a>
+  <a class="next" href="examples.html">
+    <span>Next</span>
+    <strong>Example configs &rarr;</strong>
+  </a>
+</div>
+
+<footer>
+  <p>Defaults in this reference are the ones the code actually applies with a key left out —
+  not suggestions.</p>
+</footer>
+
+</div>
+</main>
+</div>
+<script src="site.js"></script>
+</body>
+</html>
