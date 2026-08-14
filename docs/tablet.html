@@ -196,6 +196,25 @@ cached, you get <em>the laptop isn't answering</em> and a <strong>Try again</str
 rather than the browser's own error page, which in a window with no address bar would be a
 dead end.</p>
 
+<h2 id="offline">When the laptop isn't answering</h2>
+
+<p>The dot in the header turns red and <strong>every tile dims and stops responding</strong>.
+A tile that still looks live while nothing is listening is one you tap twice and then harder,
+so the page would rather show you it has nothing to send to. The banner says it in words as
+well, since a dimmed tile doesn't distinguish a laptop asleep from one on another network.</p>
+
+<p>Being refused counts as not answering — the tap would be refused too — so the rule stays a
+single one: <em>red dot, dead tiles, banner for the reason</em>. The groups still scroll, so
+the panel can be read while it's out of touch, and the page knocks every three seconds; the
+first answer that arrives brings everything back.</p>
+
+<p><strong>Changing the token drops the tablet on purpose.</strong> Whether you press
+<strong>New</strong> in the status window, edit the token file, or point the panel at a
+different one, the server restarts — which lets go of the parked long poll — and the next
+request comes back <em>401</em>. The page discards the token it was holding rather than
+retrying with it, and returns to the token box quoting what the laptop said. Scan the QR again
+with <strong>Show</strong> on to pair it back.</p>
+
 <h2 id="wake">Keeping the tablet's screen on</h2>
 
 <p>A panel that goes black after 30 seconds isn't a panel. The page asks for a screen wake

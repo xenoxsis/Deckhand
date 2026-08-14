@@ -716,6 +716,22 @@ scratch — so it carries each group's scroll position across. Without that, tap
 command in a branch halfway down the list threw the list back to the top, away from both
 the tile just used and the ones beside it.
 
+**The tiles go dead when the laptop stops answering.** The dot in the header turns red,
+and every tile dims and stops responding to a tap — a tile that looks live while nothing
+is listening is one you tap twice and then harder. The banner says it in words as well,
+because a dimmed tile alone doesn't distinguish a laptop asleep from one off the network.
+A refusal counts as not answering, since the tap would be refused too, so what's on screen
+stays one rule: red dot, dead tiles, and the banner for the reason. The groups still
+scroll, so the panel can still be read while it's out of touch, and the first answer that
+arrives brings everything back — the page knocks every three seconds until one does.
+
+**A changed token puts the tablet back at its token box.** However it changed — **New**, a
+hand-edited file, a different file chosen — the server is restarted, which drops the parked
+long poll, and the next request is answered *401*. The page throws away the token it was
+holding rather than retrying with it, and shows what the laptop said, so a tablet stops
+being a live control surface within seconds of the token it knows ceasing to be the token.
+Scanning the QR again with **Show** on pairs it back.
+
 **It replaces itself when the laptop app is rebuilt.** The page and the snapshot are one
 design, so a page the tablet opened before a rebuild goes on drawing new snapshots with
 old code — which looks like a fault in the panel, not a stale tab. Every snapshot carries

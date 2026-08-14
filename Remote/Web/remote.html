@@ -139,6 +139,15 @@
   button.bad { animation: bad .5s ease-out; }
   @keyframes ok { from { background: #2ea043; border-color: #2ea043; } }
   @keyframes bad { from { background: #d1242f; border-color: #d1242f; } }
+  /*
+    Nothing to tap while the laptop isn't answering. The red dot and the dead tiles are
+    the same fact said twice on purpose: the dot is what you check, the tiles are what you
+    reach for, and a tile that looks live and does nothing is one you tap again harder.
+    Dimmed rather than removed, so the panel still reads as itself and you can see what
+    will come back. pointer-events comes off the buttons alone — the groups go on
+    scrolling, since reading the panel is still worth doing while it's out of touch.
+  */
+  #panel.lost .tiles button, #modal.lost button { opacity: .4; pointer-events: none; }
 
   #gate { padding: 40px 24px; max-width: 420px; margin: 0 auto; }
   #gate p { color: var(--dim); font-size: 14px; }
@@ -297,6 +306,11 @@ let stuck = "";
 // wrong tokens tried here. Cleared by the first request that gets through.
 let blocked = "";
 
+// Nothing came back from the last request. Kept apart from `blocked`, which is the laptop
+// answering that it won't serve this device: that one is news, this one is the absence of
+// any — and only one of them means a tap has nowhere to go.
+let dropped = "";
+
 // The panel being unlocked over there, as of the last snapshot.
 let unlocked = "";
 
@@ -316,14 +330,19 @@ function fail(message) {
 }
 
 /*
-  The one place the banner is decided. Three different things can want it and they don't
-  arrive together — being out of date is noticed while drawing, being refused while
-  fetching, the panel being unlocked comes in a snapshot — so each sets its own variable
-  and this orders them by how little the page can do about it. Being out of date outranks
-  the rest: it's the one this page can't recover from by itself.
+  The one place the banner is decided. Four different things can want it and they don't
+  arrive together — being out of date is noticed while drawing, being refused or answered
+  by nobody while fetching, the panel being unlocked comes in a snapshot — so each sets
+  its own variable and this orders them by how little the page can do about it. Being out
+  of date outranks the rest: it's the one this page can't recover from by itself.
+
+  Silence outranks a refusal even though both can be set at once, because a refusal is
+  remembered from the last answer that came: while nothing is coming, that reason is
+  history rather than the trouble in front of you. An unlocked panel is the same kind of
+  stale, and ranks last for the same reason.
 */
 function banner() {
-  const trouble = stuck || blocked || unlocked;
+  const trouble = stuck || dropped || blocked || unlocked;
   bannerEl.classList.toggle("show", trouble !== "");
   bannerEl.textContent = trouble;
 }
@@ -747,6 +766,23 @@ async function onTap(button, id = button && button.dataset.id) {
   below just keeps one request parked over there for as long as the page is on screen.
 */
 
+/*
+  Whether the laptop is answering: the dot shows it and the tiles obey it. A refusal
+  counts as not answering — a tap would be refused as well, and the banner is already
+  carrying the laptop's own words for it — so what's on screen stays one rule you can
+  learn in a moment: red dot, dead tiles.
+
+  `why` is the banner line, and is empty for a refusal, whose reason `blocked` already
+  holds and says better.
+*/
+function reachable(answering, why = "") {
+  linkEl.className = answering ? "live" : "lost";
+  panel.classList.toggle("lost", !answering);
+  modalEl.classList.toggle("lost", !answering);
+  dropped = answering ? "" : why;
+  banner();
+}
+
 // Whether a poll is already on the wire — a tap's "pick it up at once" poll must not
 // stack a second request behind the parked one.
 let polling = false;
@@ -759,6 +795,11 @@ let pollAbort = null;
 async function poll() {
   if (polling) return true;
   polling = true;
+  // Which pump this request belongs to, so a failure can be told from a cutting loose:
+  // stop() aborts the parked request, and that abort says the page went away, not that
+  // the laptop did. Without this, every switch away from the tablet's home screen would
+  // come back to a red dot and dimmed tiles for as long as the first poll takes.
+  const mine = pumpGeneration;
   pollAbort = "AbortController" in window ? new AbortController() : null;
   // Over the laptop's 25s hold, so a healthy parked request is never the thing cut off;
   // a dead socket still turns the dot red on the next pass.
@@ -770,13 +811,18 @@ async function poll() {
     const response = await api(`/api/tiles?since=${revision}&page=${build}`, {
       signal: pollAbort && pollAbort.signal,
     });
-    linkEl.className = "live";
+    reachable(true);
     if (response.status !== 204) draw(await response.json());
     return true;
   } catch (error) {
-    // "unauthorized" tore the session down already; "refused" is in the banner. Either
-    // way the pump backs off rather than hammering.
-    if (error.message !== "unauthorized") linkEl.className = "lost";
+    // "unauthorized" tore the session down already — the token box is up, so there are no
+    // tiles to dim and nothing to say twice. A request this pump no longer owns says
+    // nothing about anything. Either way the pump backs off rather than hammering.
+    if (error.message !== "unauthorized" && mine === pumpGeneration) {
+      reachable(false, error.message === "refused" ? ""
+        : "No answer from the laptop, so the tiles are off until it's back. Check it's "
+          + "awake, and on the same network as this tablet.");
+    }
     return false;
   } finally {
     if (cutoff) clearTimeout(cutoff);
