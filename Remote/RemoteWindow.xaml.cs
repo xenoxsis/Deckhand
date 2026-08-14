@@ -1,3 +1,4 @@
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -106,6 +107,17 @@ public partial class RemoteWindow : Window
         // Which file it came from. A masked field can't otherwise answer "is it reading the
         // one I edited?", which is the question after changing it and tapping ↻.
         TokenText.ToolTip = status.TokenSource;
+
+        // The path is on screen now rather than only in that tooltip, because there are
+        // buttons beside it that act on it and a button whose target is invisible is a
+        // button nobody presses twice.
+        string file = _panel.TokenFilePath();
+        if (file != _fileShown)
+        {
+            _fileShown = file;
+            TokenFileText.Text = file;
+            TokenFileText.ToolTip = $"{file}\n\n{status.TokenSource}";
+        }
 
         DrawQr(status);
 
@@ -278,6 +290,56 @@ public partial class RemoteWindow : Window
             MessageBox.Show("Something else is using the clipboard — the token wasn't copied.",
                             "Deckhand", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    /// <summary>The token file the line currently names, so the once-a-second Refresh
+    /// isn't setting the same string on it forever.</summary>
+    private string? _fileShown;
+
+    /// <summary>
+    /// Chooses the file the token is kept in. A save dialog rather than an open one
+    /// because the file needn't exist yet — the ordinary case is naming somewhere new
+    /// and having the token written there — but an existing one is adopted rather than
+    /// overwritten, which is why there is no overwrite prompt to answer.
+    /// </summary>
+    private void ChangeTokenFile_Click(object sender, RoutedEventArgs e)
+    {
+        string current = _panel.TokenFilePath();
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Where should the token be kept?",
+            FileName = Path.GetFileName(current),
+            InitialDirectory = Path.GetDirectoryName(current) ?? "",
+            Filter = "All files|*",
+            OverwritePrompt = false,
+            CheckPathExists = true,
+        };
+
+        if (dialog.ShowDialog(this) != true) return;
+
+        var (ok, message) = _panel.UseTokenFile(dialog.FileName);
+        MessageBox.Show(this, message, "Deckhand", MessageBoxButton.OK,
+                        ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
+    }
+
+    /// <summary>
+    /// Replaces the token. Asked about first: this is the one button here that breaks
+    /// something that is currently working, and it can't be undone by pressing it again.
+    /// </summary>
+    private void NewToken_Click(object sender, RoutedEventArgs e)
+    {
+        var answer = MessageBox.Show(
+            this,
+            $"Write a new token to {_panel.TokenFilePath()}?\n\nThe one in use is replaced, "
+            + "and every device paired with it stops working until it is given the new one.",
+            "Deckhand", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+
+        if (answer != MessageBoxResult.OK) return;
+
+        var (ok, message) = _panel.NewRemoteToken();
+        MessageBox.Show(this, message, "Deckhand", MessageBoxButton.OK,
+                        ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
     }
 
     /// <summary>What the QR currently encodes, so it's redrawn only when that changes —

@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Serialization;
 
 namespace Deckhand;
@@ -102,10 +104,51 @@ public class RemoteSettings
     /// </summary>
     public List<string> AllowedHosts { get; set; } = new();
 
-    /// <summary>The token file's path, configured or default.</summary>
+    /// <summary>
+    /// The token file's path: the one chosen in the status window if there is one, then
+    /// the config's, then the default beside the user profile. See
+    /// <see cref="TokenLocation"/> for why a choice made in the window wins.
+    /// </summary>
     public string ResolveTokenFile() =>
-        string.IsNullOrWhiteSpace(TokenFile)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                           ".deckhand_token")
-            : TokenFile;
+        TokenLocation.Chosen
+        ?? (string.IsNullOrWhiteSpace(TokenFile)
+                ? DefaultTokenFile
+                : TokenFile);
+
+    /// <summary>Where the token lives when nobody has said otherwise.</summary>
+    public static string DefaultTokenFile =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                     ".deckhand_token");
+
+    /// <summary>
+    /// A fresh token, in the shape the README's PowerShell recipe makes: 25 characters
+    /// drawn from a 32-symbol alphabet with the pairs that are misread off a screen left
+    /// out — no O beside 0, no l or I beside 1, no u beside v — in five hyphenated
+    /// groups, so it can be read aloud and typed on a tablet without a mistake.
+    ///
+    /// 256 is a whole number of 32s, so taking each byte modulo the alphabet is unbiased
+    /// and there is nothing to reject and redraw.
+    /// </summary>
+    public static string NewToken()
+    {
+        const string alphabet = "0123456789abcdefghjkmnpqrstvwxyz";
+        byte[] bytes = RandomNumberGenerator.GetBytes(25);
+
+        var symbols = bytes.Select(b => alphabet[b % alphabet.Length]).ToArray();
+        return string.Join('-', Enumerable.Range(0, 5)
+                                          .Select(g => new string(symbols, g * 5, 5)));
+    }
+
+    /// <summary>
+    /// Writes a token as the file is expected to hold it: the token, a newline, nothing
+    /// else, and no byte order mark — <see cref="ResolveToken"/> takes the first line and
+    /// trims it, and a BOM would be part of the first character it read.
+    /// </summary>
+    public static void WriteTokenFile(string path, string token)
+    {
+        string? folder = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(folder)) Directory.CreateDirectory(folder);
+
+        File.WriteAllText(path, token + "\n", new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+    }
 }

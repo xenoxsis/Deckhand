@@ -635,6 +635,30 @@ nothing else; set `remote.tokenFile` to look somewhere else. A token still writt
 `remote.token` is honoured so an old config keeps working, but the status window's tooltip
 on the token says where the one in use came from, and says to move it.
 
+**Both of those are also buttons.** The status window shows the file under the token,
+with **Change…** and **New** beside it — there is no settings page, because two things
+about the token belong next to the token rather than behind a door.
+
+**New** writes a fresh token to whatever file is in use and restarts the server, which
+locks out every device paired with the old one. That is the point of it rather than a
+side effect: a rotation nobody is disconnected by wouldn't be one. It asks first.
+
+**Change…** picks the file. A file that already holds a token is *adopted*, not
+overwritten — pointing the panel at a key you already have is the reason to change this,
+and writing over it would lock out whatever else reads it. A missing or empty one is
+written with the token in use, so the change never leaves the panel without a key. The
+old file is left where it is, still holding a copy; deleting a file you didn't name is a
+bigger thing than moving a setting, so the confirmation says so and leaves it to you.
+
+The choice is remembered in `%LOCALAPPDATA%\Deckhand\token-file.json`, not written back
+into the config — that file is hand-edited and full of comments, and a program that
+rewrites it to record one path strips all of them. So a path chosen here **wins over
+`remote.tokenFile`**, being the later and more deliberate of the two acts. Choosing the
+path the config or the default already names clears the override rather than recording
+it, which is the way back to being config-driven.
+
+If you'd rather mint one yourself, the button does exactly this:
+
 ```powershell
 # 29 characters of the alphabet that survives being read off a screen
 $a='0123456789abcdefghjkmnpqrstvwxyz'; $b=[byte[]]::new(25)

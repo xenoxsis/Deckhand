@@ -914,6 +914,12 @@ including what stops it being a remote shell, is on the
     </div>
     <p>Where the token really lives: one line, nothing else. Outside the project, so copying
     the code somewhere doesn't copy the key with it.</p>
+    <p>The status window can change this without editing the config: the file is shown under
+    the token, with <strong>Change&hellip;</strong> beside it. A file that already holds a token
+    is adopted rather than overwritten; an empty or missing one is written with the token in
+    use. That choice is remembered in <code>%LOCALAPPDATA%\Deckhand\token-file.json</code> and
+    <em>wins over this key</em> — picking the path this key already names clears it again.
+    <strong>New</strong>, beside it, writes a fresh token and locks out every paired device.</p>
   </div>
 
   <div class="key">
@@ -956,7 +962,7 @@ including what stops it being a remote shell, is on the
     <tr><td><code>dashboard.schema.json</code></td><td>The schema both files point at, for editor completion.</td></tr>
     <tr><td><code>%USERPROFILE%\.deckhand_token</code></td><td>The remote token, one line.</td></tr>
     <tr><td><code>%USERPROFILE%\.deckhand_history</code></td><td>Folder-tile taps, for ordering. Safe to delete.</td></tr>
-    <tr><td><code>%LOCALAPPDATA%\Deckhand\</code></td><td>Remembered window size and position.</td></tr>
+    <tr><td><code>%LOCALAPPDATA%\Deckhand\</code></td><td>Remembered window size and position, and the token file chosen in the status window.</td></tr>
   </tbody>
 </table>
 </div>

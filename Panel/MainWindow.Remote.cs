@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -97,6 +98,91 @@ public partial class MainWindow
             Ready: _unlocked is null && !DashboardHasFocus(),
             activity.LastSeenUtc, activity.Peer, activity.Taps, activity.Screen,
             Pinned: _remote?.Pinned);
+    }
+
+    /// <summary>The token file in use, so the status window can show it and change it.</summary>
+    internal string TokenFilePath() => _config.Remote.ResolveTokenFile();
+
+    /// <summary>
+    /// Points the panel at a different token file and restarts the server, so the file
+    /// shown is the file being enforced rather than one that will be read at some later
+    /// reload.
+    ///
+    /// A file that already holds a token is adopted, not overwritten: pointing at a key
+    /// you already have is the reason to change this, and writing over it would lock out
+    /// whatever else was reading it. One that is missing or empty is written with the
+    /// token in use, so changing where the key is kept never leaves the panel without one.
+    ///
+    /// The old file is left alone. It still has a copy of the key in it, which is worth
+    /// saying rather than acting on — deleting a file the user did not name is a bigger
+    /// thing than moving a setting.
+    /// </summary>
+    internal (bool Ok, string Message) UseTokenFile(string path)
+    {
+        try
+        {
+            string? already = File.Exists(path) ? File.ReadLines(path).FirstOrDefault()?.Trim() : null;
+            bool adopted = !string.IsNullOrEmpty(already);
+
+            if (!adopted) RemoteSettings.WriteTokenFile(path, _config.Remote.Token);
+
+            // Null when it is the path the config or the default already names: nothing to
+            // remember, and a note left here would go on overriding a later config edit.
+            string plain = Path.GetFullPath(path);
+            string configured = string.IsNullOrWhiteSpace(_config.Remote.TokenFile)
+                ? RemoteSettings.DefaultTokenFile
+                : _config.Remote.TokenFile;
+
+            TokenLocation.Choose(
+                plain.Equals(Path.GetFullPath(configured), StringComparison.OrdinalIgnoreCase)
+                    ? null
+                    : plain);
+
+            _config.Remote.ResolveToken();
+            StartRemote();
+
+            _log.Add(LogKind.Panel, $"token file is now {plain}");
+
+            return (true, adopted
+                ? $"Reading the token already in {plain}.\n\nThe tablet will need the new "
+                  + "token — pair it again."
+                : $"The token was written to {plain}.\n\nThe old file still holds a copy; "
+                  + "delete it yourself when you're happy this worked.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                      or ArgumentException or NotSupportedException)
+        {
+            _log.Add(LogKind.Warning, $"token file not changed — {ex.Message}");
+            return (false, $"That file couldn't be used:\n\n{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Replaces the token with a new one and restarts the server. Every device paired
+    /// with the old one is locked out by that, which is the point of the button — it is
+    /// the answer to "someone saw my screen", and a rotation nobody is disconnected by
+    /// would not be one.
+    /// </summary>
+    internal (bool Ok, string Message) NewRemoteToken()
+    {
+        string path = _config.Remote.ResolveTokenFile();
+
+        try
+        {
+            RemoteSettings.WriteTokenFile(path, RemoteSettings.NewToken());
+            _config.Remote.ResolveToken();
+            StartRemote();
+
+            _log.Add(LogKind.Panel, $"a new token was written to {path}");
+
+            return (true, $"A new token is in {path}.\n\nEvery paired device is now locked "
+                          + "out — scan the QR again with the token shown.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.Add(LogKind.Warning, $"no new token — {ex.Message}");
+            return (false, $"The token file couldn't be written:\n\n{ex.Message}");
+        }
     }
 
     /// <summary>

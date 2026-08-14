@@ -82,30 +82,60 @@
             </StackPanel>
         </Grid>
 
-        <Grid Grid.Row="1" Margin="0,16,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
+        <StackPanel Grid.Row="1" Margin="0,16,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="TOKEN" Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"/>
-                <TextBlock x:Name="TokenText" FontFamily="Consolas" FontSize="15"
-                           TextTrimming="CharacterEllipsis"/>
-            </StackPanel>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="TOKEN" Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TokenText" FontFamily="Consolas" FontSize="15"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
 
-            <!-- Words rather than glyphs: ⧉ and 👁 are not in every font at every size,
-                 and a tofu box on the only button that reveals a secret is not the place
-                 to find that out. -->
-            <Button x:Name="ShowTokenButton" Grid.Column="1" Content="Show"
-                    ToolTip="Show the token on this screen"
-                    Style="{StaticResource ToolButton}" Width="56" FontSize="12"
-                    Click="ShowToken_Click"/>
-            <Button Grid.Column="2" Content="Copy" ToolTip="Copy the token to the clipboard"
-                    Style="{StaticResource ToolButton}" Width="56" FontSize="12"
-                    Click="CopyToken_Click"/>
-        </Grid>
+                <!-- Words rather than glyphs: ⧉ and 👁 are not in every font at every size,
+                     and a tofu box on the only button that reveals a secret is not the place
+                     to find that out. -->
+                <Button x:Name="ShowTokenButton" Grid.Column="1" Content="Show"
+                        ToolTip="Show the token on this screen"
+                        Style="{StaticResource ToolButton}" Width="56" FontSize="12"
+                        Click="ShowToken_Click"/>
+                <Button Grid.Column="2" Content="Copy" ToolTip="Copy the token to the clipboard"
+                        Style="{StaticResource ToolButton}" Width="56" FontSize="12"
+                        Click="CopyToken_Click"/>
+            </Grid>
+
+            <!-- The file the token is read from, and the two things worth doing to it. A
+                 line here rather than a settings window: there are two of them, they are
+                 about the token that is on screen directly above, and a page you have to
+                 open to find them would be a worse home than the one place this window is
+                 already about. -->
+            <Grid Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="KEPT IN" Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"/>
+                    <TextBlock x:Name="TokenFileText" Foreground="#B6B6BC" FontSize="12"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+
+                <Button Grid.Column="1" Content="Change…"
+                        ToolTip="Choose the file the token is kept in"
+                        Style="{StaticResource ToolButton}" Width="72" FontSize="12"
+                        Click="ChangeTokenFile_Click"/>
+                <Button Grid.Column="2" Content="New"
+                        ToolTip="Replace the token with a new one. Every paired device is locked out."
+                        Style="{StaticResource ToolButton}" Width="56" FontSize="12"
+                        Click="NewToken_Click"/>
+            </Grid>
+        </StackPanel>
 
         <StackPanel Grid.Row="2" Margin="0,18,0,0">
             <Border Height="1" Background="#3F3F46" Margin="0,0,0,12"/>
