@@ -291,6 +291,10 @@ public partial class RemoteWindow : Window
     /// browser — it isn't sent with any request — and the page stores it and scrubs it
     /// from the address bar on arrival. Tying that to Show keeps Show the one switch
     /// that reveals the secret; masked, the QR is only the address.
+    ///
+    /// Which of the two you are looking at is written under the code, because it is not
+    /// visible in the code itself: scanning a QR that turns out to be address-only ends
+    /// at a page asking for a token, and nothing on screen would have said why.
     /// </summary>
     private void DrawQr(RemoteStatus status)
     {
@@ -307,17 +311,19 @@ public partial class RemoteWindow : Window
         if (content.Length == 0)
         {
             QrImage.Source = null;
-            QrBox.Visibility = Visibility.Collapsed;
+            QrPanel.Visibility = Visibility.Collapsed;
             return;
         }
 
         QrImage.Source = QrBitmap(content);
-        QrBox.Visibility = Visibility.Visible;
-        QrBox.ToolTip = _tokenShown
-            ? "Scan on the tablet. The token is shown, so the QR carries it too — "
-              + "scanning is the whole setup."
-            : "Scan on the tablet to open this address. Tap Show to fold the token "
-              + "into the QR as well.";
+        QrPanel.Visibility = Visibility.Visible;
+
+        // The same condition the content is built from, so the caption cannot claim
+        // something the code doesn't carry — including the case where there is no token
+        // yet, where Show reveals nothing and the QR stays the address either way.
+        QrCaption.Text = _tokenShown && status.Token.Length > 0
+            ? "Carries the token — scan and you're in."
+            : "Address only — tap Show to include the token.";
     }
 
     /// <summary>

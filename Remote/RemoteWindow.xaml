@@ -64,14 +64,22 @@
             <!-- The first address as a QR, so setup is a scan rather than typing an IP on
                  a tablet keyboard. White on purpose: scanners want a light background, and
                  the padding is the quiet zone. NearestNeighbor keeps the modules square
-                 when the 1px-per-module bitmap is scaled up. Its tooltip explains the one
-                 subtlety — the token rides along only while Show has it revealed. -->
-            <Border x:Name="QrBox" Grid.Column="1" Background="White" CornerRadius="6"
-                    Padding="8" Margin="14,2,0,0" VerticalAlignment="Top"
-                    Visibility="Collapsed">
-                <Image x:Name="QrImage" Width="112" Height="112"
-                       RenderOptions.BitmapScalingMode="NearestNeighbor"/>
-            </Border>
+                 when the 1px-per-module bitmap is scaled up.
+                 The caption underneath says whether the token is in the code, because the
+                 one subtlety here — it rides along only while Show has it revealed — is
+                 the thing you need to know at the moment you are pointing a tablet at it,
+                 and a tooltip on a window you glance at is not read. Its width matches the
+                 Border's (8 padding either side of a 112 image) so the two line up. -->
+            <StackPanel x:Name="QrPanel" Grid.Column="1" Margin="14,2,0,0"
+                        VerticalAlignment="Top" Visibility="Collapsed">
+                <Border Background="White" CornerRadius="6" Padding="8">
+                    <Image x:Name="QrImage" Width="112" Height="112"
+                           RenderOptions.BitmapScalingMode="NearestNeighbor"/>
+                </Border>
+                <TextBlock x:Name="QrCaption" Width="128" Margin="0,6,0,0"
+                           Foreground="#8A8A8A" FontSize="11" TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+            </StackPanel>
         </Grid>
 
         <Grid Grid.Row="1" Margin="0,16,0,0">
