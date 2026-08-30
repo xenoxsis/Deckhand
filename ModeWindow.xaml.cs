@@ -41,6 +41,8 @@ public partial class ModeWindow : Window
 
     private void Remote_Click(object sender, RoutedEventArgs e) => Pick(DashboardMode.Remote);
 
+    private void Designer_Click(object sender, RoutedEventArgs e) => Pick(DashboardMode.Designer);
+
     private void Pick(DashboardMode mode)
     {
         Mode = mode;
@@ -49,7 +51,8 @@ public partial class ModeWindow : Window
 
     /// <summary>
     /// Keys as well as taps: this window can be reached before a tablet is anywhere
-    /// near, and Enter is what a keyboard expects to do with a two-option question.
+    /// near, and Enter is what a keyboard expects to do with a question whose usual
+    /// answer — the local panel — it already knows.
     /// </summary>
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
@@ -76,6 +79,11 @@ public partial class ModeWindow : Window
             case Key.D2:
             case Key.NumPad2:
                 if (RemoteButton.IsEnabled) Pick(DashboardMode.Remote);
+                break;
+
+            case Key.D3:
+            case Key.NumPad3:
+                Pick(DashboardMode.Designer);
                 break;
 
             default:

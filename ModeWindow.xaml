@@ -43,8 +43,17 @@
         <TextBlock x:Name="RemoteNote" Foreground="#F0D68A" FontSize="12"
                    TextWrapping="Wrap" Margin="6,6,6,0" Visibility="Collapsed"/>
 
+        <Button Style="{StaticResource TileButton}" Height="86" Click="Designer_Click">
+            <StackPanel>
+                <TextBlock Text="Design the layout" FontSize="17" TextAlignment="Center"/>
+                <TextBlock Foreground="#8A8A8A" FontSize="12" TextAlignment="Center"
+                           TextWrapping="Wrap" Margin="0,4,0,0"
+                           Text="No panel — a window for building dashboard.json: pick the grid, arrange groups and buttons, and watch a preview take shape."/>
+            </StackPanel>
+        </Button>
+
         <TextBlock Foreground="#6A6A70" FontSize="11" TextWrapping="Wrap" Margin="6,16,6,0"
-                   Text="Start with --local or --remote to skip this question."/>
+                   Text="Start with --local, --remote or --designer to skip this question."/>
 
     </StackPanel>
 </Window>

@@ -210,12 +210,7 @@ public class DashboardConfig
         string path = ResolvePath();
         if (!File.Exists(path)) return Ready(new DashboardConfig(), path);
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true,
-        };
+        var options = ReadOptions();
 
         GridRangeConverter.Problems.Clear();
 
@@ -286,6 +281,42 @@ public class DashboardConfig
             return Ready(new DashboardConfig(), path);
         }
     }
+
+    /// <summary>
+    /// Reads one file by itself — no dashboard.local.json laid over it. This is the
+    /// designer's load: it rewrites the file it read, and a merged read would bake this
+    /// machine's overrides into the shared file the moment it was saved.
+    /// </summary>
+    public static DashboardConfig LoadFile(string path, out string? error)
+    {
+        error = null;
+        if (!File.Exists(path)) return Ready(new DashboardConfig(), path);
+
+        GridRangeConverter.Problems.Clear();
+
+        try
+        {
+            string text = File.ReadAllText(path);
+            var config = JsonSerializer.Deserialize<DashboardConfig>(text, ReadOptions())
+                         ?? new DashboardConfig();
+            NoteUnknownKeys(text, config, source: "");
+            return Ready(config, path);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            error = $"{path}\n\n{ex.Message}";
+            return Ready(new DashboardConfig(), path);
+        }
+    }
+
+    /// <summary>How the file is read everywhere: comments and trailing commas are part
+    /// of the format, and keys match however they're capitalised.</summary>
+    private static JsonSerializerOptions ReadOptions() => new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+    };
 
     /// <summary>
     /// The shared file with the local file's keys laid over it. Objects merge a level

@@ -65,12 +65,13 @@ must itself run elevated to debug with F5.
 
 ## Where the code lives
 
-One project, four folders, and a root that holds only what has to be there:
+One project, five folders, and a root that holds only what has to be there:
 
 | | |
 |---|---|
-| `Config/` | `dashboard.json` as objects, and the reading, merging and checking of it — plus the folder scan a `source` section is built from. Deliberately free of WPF and Win32, which is what lets the loader be compiled into a plain console project and tested without a screen. |
+| `Config/` | `dashboard.json` as objects, and the reading, merging, checking and (for the designer) writing of it — plus the folder scan a `source` section is built from. Deliberately free of WPF and Win32, which is what lets the loader be compiled into a plain console project and tested without a screen. |
 | `Panel/` | The panel window: placing sections on the grid, building tiles, what a tap does, and the chrome around the edge. |
+| `Designer/` | The layout designer: the editing window, and a preview that draws a config with the panel's own placer and styles but none of its behaviour. |
 | `Remote/` | The tablet's side: the HTTP server, the records it serializes, the status window and its notification-area icon, and `Remote/Web/` — the page a browser is served, which the csproj embeds from there. |
 | `Interop/` | Everything said to Windows directly: the P/Invokes, the foreground hook, the window list, and the URL and de-elevated launchers. |
 | the root | Startup (`App`, `ModeWindow`), the two small types both halves share, and the files the build and the config are addressed by name: `dashboard.example.json`, the schema, `icon.ico`, `icon.ps1`. |
@@ -93,14 +94,23 @@ On start the dashboard asks where you want it:
 - **On a tablet** — nothing on this screen but a small ordinary window, with the panel
   itself served to the tablet's browser. See
   [The panel on a tablet](#the-panel-on-a-tablet).
+- **Design the layout** — no panel at all: a window for building `dashboard.json`
+  without typing it. Pick the grid, add groups and buttons, and a live preview draws
+  the panel as you go — the same placer and the same styles as the real thing, minus
+  the tapping. Set a screen size (a tablet's, say) above the preview and it's laid out
+  at exactly those pixels, shrunk to fit the window. Saving writes the file fresh
+  through the same model the panel loads, keeping the parts the designer doesn't edit
+  — profiles, the `remote` block, a section's folder `source` — but not comments,
+  which it asks about before overwriting a file that has any. A running panel notices
+  the save and redraws itself.
 
-The question is only asked when there's something to choose between: with
-`remote.enabled: false` it goes straight to the panel, exactly as it did before there
-was a remote side at all. Closing the question without answering quits, rather than
-falling back to the panel — that would put a window on the screen you'd just decided
-against, in the corner it was last left in.
+Enter answers the question the usual way — the local panel — so the everyday start is
+still one keypress. Closing it without answering quits, rather than falling back to
+the panel — that would put a window on the screen you'd just decided against, in the
+corner it was last left in.
 
-`--local` and `--remote` answer it in advance, which is what a pinned shortcut wants:
+`--local`, `--remote` and `--designer` answer it in advance, which is what a pinned
+shortcut wants:
 
 ```
 Start-Process bin\Debug\net9.0-windows\Deckhand.exe -ArgumentList --remote

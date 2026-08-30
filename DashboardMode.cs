@@ -1,8 +1,8 @@
 namespace Deckhand;
 
 /// <summary>
-/// Which of the two ways the dashboard is being used, decided once at startup because
-/// the two want opposite things from a window.
+/// Which of the ways the dashboard is being used, decided once at startup because
+/// they want opposite things from a window.
 /// </summary>
 public enum DashboardMode
 {
@@ -18,4 +18,11 @@ public enum DashboardMode
     /// just aren't drawn on this screen.
     /// </summary>
     Remote,
+
+    /// <summary>
+    /// No panel at all: an ordinary window for building dashboard.json — grid,
+    /// groups, buttons — with a live preview of what the panel will draw. This mode
+    /// never reaches <see cref="MainWindow"/>; nothing launches and nothing types.
+    /// </summary>
+    Designer,
 }

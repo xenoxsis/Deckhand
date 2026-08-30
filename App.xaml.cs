@@ -6,15 +6,15 @@ public partial class App : Application
 {
     /// <summary>
     /// Asks where the panel is going to be used, then builds only what that answer
-    /// needs: the always-on-top panel on this screen, or a small ordinary window and an
-    /// HTTP server for a tablet's browser. Local mode is the app exactly as it was
+    /// needs: the always-on-top panel on this screen, a small ordinary window and an
+    /// HTTP server for a tablet's browser, or the designer — a window for building
+    /// the config, with no panel at all. Local mode is the app exactly as it was
     /// before there was a remote side — nothing listens, no port is opened, and the
     /// token is never read.
     ///
-    /// The question is only asked when there's something to choose between: with
-    /// <see cref="RemoteSettings.Enabled"/> false this is a panel and only a panel, and
-    /// starting with --local or --remote answers it in advance, which is what a pinned
-    /// shortcut wants.
+    /// Starting with --local, --remote or --designer answers the question in advance,
+    /// which is what a pinned shortcut wants; Enter in the chooser is Local, so the
+    /// everyday path is still one keypress.
     /// </summary>
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -44,6 +44,16 @@ public partial class App : Application
         if (ResolveMode(e.Args, remote) is not { } mode)
         {
             RequestShutdown();
+            return;
+        }
+
+        // The designer builds no panel: it only reads and writes the config, and the
+        // preview it draws is its own. Closing it is the way out of this mode.
+        if (mode == DashboardMode.Designer)
+        {
+            var designer = new DesignerWindow();
+            designer.Closed += (_, _) => RequestShutdown();
+            designer.Show();
             return;
         }
 
@@ -135,9 +145,11 @@ public partial class App : Application
         // --remote means it, rather than depending on the file agreeing that day.
         if (args.Any(a => a.Equals("--local", StringComparison.OrdinalIgnoreCase))) return DashboardMode.Local;
         if (args.Any(a => a.Equals("--remote", StringComparison.OrdinalIgnoreCase))) return DashboardMode.Remote;
+        if (args.Any(a => a.Equals("--designer", StringComparison.OrdinalIgnoreCase))) return DashboardMode.Designer;
 
-        if (!remote.Enabled) return DashboardMode.Local;
-
+        // The question used to be skipped with the remote off, there being nothing to
+        // choose then. The designer means there always is now — and Enter answers
+        // Local, so the everyday start is unchanged in keystrokes.
         var chooser = new ModeWindow(remote);
         chooser.ShowDialog();
         return chooser.Mode;
