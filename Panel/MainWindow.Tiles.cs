@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 
@@ -214,32 +215,58 @@ public partial class MainWindow
     /// </summary>
     private FrameworkElement AppTile(AppEntry app)
     {
-        var main = MakeTile(app.Label, () => ActivateApp(app), "SplitTileLeft");
-        var add = MakeTile(NewWindow, () => LaunchApp(app), "SplitTileRight");
+        var main = Tile(app.Label, () => ActivateApp(app), "SplitTileLeft",
+                        app.Color, app.Icon, app.IconMode);
 
-        // Both halves, or the split control stops reading as one control.
-        Accent(main, app.Color);
-        Accent(add, app.Color);
+        // The + never wears the picture, whatever the tile asked for: it's the half that
+        // opens another window, and on a pair whose wide side has become a logo it is the
+        // only thing left with a shape to look for.
+        var add = Tile(NewWindow, () => LaunchApp(app), "SplitTileRight", app.Color);
 
         return SideBySide(main, add, joined: true);
     }
 
+    private Button SnippetTile(SnippetEntry snippet) =>
+        Tile(snippet.Label, () => InsertSnippet(snippet), "TileButton",
+             snippet.Color, snippet.Icon, snippet.IconMode);
+
     /// <summary>
-    /// Colours one tile's outline. On a panel of identical tiles a colour is faster to
-    /// hit than a label is to read, which on a touch surface is the whole game. The hex
-    /// goes into Tag as well as the brush because the tablet draws this tile too, and
-    /// Tag is where <see cref="RemoteTiles"/> reads it back without unparsing a brush.
+    /// One tile wearing what its config asked for. The picture is resolved here, once,
+    /// into the two things that are wanted from it — the image this screen draws, and the
+    /// hash the tablet will ask for it by — and both go onto the button, because
+    /// <see cref="RemoteTiles"/> builds the tablet's copy by walking these buttons rather
+    /// than the config they came from.
     /// </summary>
-    private static void Accent(Button tile, string? color)
+    private Button Tile(string label, Action onClick, string style, string? color,
+                        string? icon = null, IconMode mode = IconMode.Left)
     {
-        if (string.IsNullOrWhiteSpace(color)) return;
+        // Null for a tile that asked for no picture and for one whose file couldn't be
+        // used. Either way it draws its label, and Check() has already said which.
+        var picture = TileImages.Of(_config.SourceFolder, icon);
+        var image = picture?.Image;
+
+        var button = MakeTile(label, onClick, style, image, mode);
+        Wear(button, new TileFace(Hex(color), image is null ? null : picture!.Hash, mode));
+        return button;
+    }
+
+    /// <summary>
+    /// Paints one tile's outline and remembers its face. On a panel of identical tiles a
+    /// colour is faster to hit than a label is to read, which on a touch surface is the
+    /// whole game. The face goes into Tag as well as the brush because the tablet draws
+    /// this tile too, and Tag is where <see cref="RemoteTiles"/> reads it back without
+    /// having to unparse a brush or find the config entry again.
+    /// </summary>
+    private static void Wear(Button tile, TileFace face)
+    {
+        tile.Tag = face;
+        if (face.Color is null) return;
 
         try
         {
-            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color.Trim()));
+            var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(face.Color));
             brush.Freeze();
             tile.BorderBrush = brush;
-            tile.Tag = color.Trim();
         }
         catch (FormatException)
         {
@@ -248,28 +275,28 @@ public partial class MainWindow
         }
     }
 
-    private Button SnippetTile(SnippetEntry snippet)
-    {
-        var tile = MakeTile(snippet.Label, () => InsertSnippet(snippet));
-        Accent(tile, snippet.Color);
-        return tile;
-    }
+    private static string? Hex(string? color) =>
+        string.IsNullOrWhiteSpace(color) ? null : color.Trim();
 
-    private Button MakeTile(string label, Action onClick, string style = "TileButton")
+    private Button MakeTile(string label, Action onClick, string style = "TileButton",
+                            ImageSource? image = null, IconMode mode = IconMode.Left)
     {
         var button = new Button
         {
-            // A TextBlock rather than a bare string so narrow grid cells wrap
-            // the label instead of overflowing it.
-            Content = new TextBlock
-            {
-                Text = label,
-                TextWrapping = TextWrapping.Wrap,
-                TextAlignment = TextAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            },
+            Content = TileFaces.Draw(label, image, mode),
             Style = (Style)Application.Current.Resources[style],
         };
+
+        // The label, kept sayable even when it isn't drawn. This is what the log calls
+        // the tile, what a tap from the tablet names it by and what a screen reader
+        // reads — none of which a picture can answer for — so it's set on every tile
+        // rather than only on the ones that turned out to need it.
+        AutomationProperties.SetName(button, label);
+        if (image is not null && mode is IconMode.Fill)
+        {
+            button.ToolTip = label.Replace("\n", " — ");
+        }
+
         button.Click += (_, _) => onClick();
         return button;
     }

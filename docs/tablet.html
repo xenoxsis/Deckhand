@@ -107,6 +107,7 @@ just isn't drawn here.</p>
     <tr><td>The token, masked until <strong>Show</strong></td><td>Also names <em>where</em> the token came from, so "is it reading my file?" is answerable without an experiment.</td></tr>
     <tr><td>Whether the tablet is getting through, and which one</td><td>A coloured dot plus the paired device's short id and the address it last called from.</td></tr>
     <tr><td>Whether the tablet is keeping its own screen awake</td><td>The page reports what it managed on every request — see <a href="#wake">keeping the screen on</a>.</td></tr>
+    <tr><td>How big the tablet's screen turned out to be</td><td>The page measures its own visible viewport and the box the tiles are laid out in, and sends both on every request — this is the one thing about the tablet the laptop can't work out for itself. In CSS pixels, with the device-pixel ratio beside them, so a tablet sold as 2560&#215;1600 reads 1280&#215;800. The <strong>tiles</strong> pair is the one to put in the designer's screen size; the log writes a line whenever either changes.</td></tr>
     <tr><td>A log of everything between the two sides</td><td>Taps, rejections, reloads, pairing. The same log the panel keeps.</td></tr>
   </tbody>
 </table>
@@ -115,14 +116,24 @@ just isn't drawn here.</p>
 <h3 id="buttons">Its buttons</h3>
 
 <ul>
+  <li><strong>Design</strong> — opens the layout designer, the same window
+    <code>--designer</code> starts with. It's here because in this mode the panel being
+    designed isn't on any screen to right-click. Its <strong>SCREEN</strong> boxes arrive
+    filled in with what this tablet reported, so the preview is at the size the tablet
+    really draws. The tablet stays paired while it's open,
+    and saving reaches the panel as an ordinary reload — so the layout appears on the
+    tablet as you arrange it. Taps are refused while the designer has focus, for the same
+    reason they are while this window has it.</li>
   <li><strong>Unpair</strong> — lets go of the paired device so another one with the right
     token can take the session. For swapping tablets without re-reading anything.</li>
   <li><strong>&#8635; Reload</strong> — re-reads the config and restarts the server, which
     also unpairs. Use it after moving to another Wi-Fi: it re-reads the addresses too.</li>
-  <li><strong>Quit</strong> — stops the server and ends the process.</li>
+  <li><strong>Quit</strong> — stops the server and ends the process. If the designer has
+    unsaved work it asks first, and Cancel there cancels the quit.</li>
   <li><strong>&#10005;</strong> — <em>doesn't</em> quit. It hides the window to the
     notification area and the panel goes on serving. Hover the tray icon for the same status
-    line, double-click to bring the window back, right-click for Reload and Quit.</li>
+    line, double-click to bring the window back, right-click for the designer, Reload and
+    Quit.</li>
 </ul>
 
 <div class="note warn">
@@ -244,6 +255,20 @@ can't express.</p>
     to reach for, because no such message exists.</p>
     <p>The ids are content-addressed hashes rebuilt with every snapshot, so an id can only
     ever name a tile that was on screen when the tablet last drew.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head"><span class="key-name">Pictures by content, never by path</span></div>
+    <p>A tile that wears a picture sends the tablet the hash of that picture's bytes, not
+    where the file is. The request that comes back for it is answered out of the set the
+    panel published with those tiles, so there is no filename in it to sanitise and nothing
+    outside that set to name: <code>/api/icon/../../dashboard.json</code> is refused for the
+    same reason a made-up hash is — neither is a key in the table. The reply says "not on the
+    panel" rather than "no such file", which would otherwise be a way to ask the laptop what
+    it has.</p>
+    <p>The bytes are behind the token like everything else. That's why the page fetches them
+    itself instead of leaving it to the browser: an <code>&lt;img src&gt;</code> can't be made
+    to send a header, so it would have meant a way in without one.</p>
   </div>
 
   <div class="key">

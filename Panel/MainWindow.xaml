@@ -125,9 +125,16 @@
                     </ScrollViewer>
 
                     <!-- A tile rather than a plain button: the tablet is shown this card
-                         as tiles, and a tile is what it knows how to tap. -->
+                         as tiles, and a tile is what it knows how to tap.
+
+                         The name is set as well as the text because this is the one tile
+                         on the card that isn't built by MakeTile, and the name is where
+                         the publish looks first for what to call a tile. It reads the text
+                         as a fallback, so this is belt and braces — and the right thing to
+                         say to a screen reader in any case. -->
                     <Button x:Name="OverlayDismiss" Grid.Row="2"
                             Style="{StaticResource TileButton}"
+                            AutomationProperties.Name="Cancel"
                             Click="OverlayDismiss_Click">
                         <TextBlock Text="Cancel"/>
                     </Button>

@@ -20,6 +20,15 @@
     <!-- Draws the QR in the remote status window. The matrix is rendered to a WPF
          bitmap by our own code; only the encoding comes from the package. -->
     <PackageReference Include="QRCoder" Version="1.8.0" />
+
+    <!-- Draws the svg a tile can wear. WPF has decoders for every other picture format
+         the config accepts and none for this one, and a tile picture that only the
+         tablet's browser could draw would be a tile that looks different there — so
+         either this or no svg at all. Only the parsing and the shapes come from the
+         package: what a tile does with the drawing is our own code, as with the QR.
+         BSD-3-Clause, and no dependencies of its own; see the License section of the
+         README about redistributing a built copy. -->
+    <PackageReference Include="SharpVectors" Version="1.8.4" />
   </ItemGroup>
 
   <ItemGroup>

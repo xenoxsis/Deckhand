@@ -179,6 +179,37 @@ public class AppEntry
     /// panel of identical tiles a colour is faster to hit than a label is to read.
     /// </summary>
     public string? Color { get; set; }
+
+    /// <summary>
+    /// A picture for the tile: the path to an image file, absolute or written relative to
+    /// dashboard.json's own folder, with %ENVVARS% expanded. Nothing is looked up or
+    /// extracted — the tile draws the file named here and no other, and the tablet is sent
+    /// those same bytes, so the two screens can't end up showing different pictures. png,
+    /// jpg, gif, bmp, ico, webp and svg — everything both a browser and this can draw.
+    ///
+    /// An svg stays a drawing rather than becoming pixels, so it's sharp at whatever size
+    /// the tile is, and it has to be self-contained: one that points at another file, or
+    /// declares entities, or carries script, is refused with a line saying which. webp is
+    /// the one whose decoder Windows keeps optional, so a machine without that component
+    /// falls back to the label — on both screens, since the panel is what offers the
+    /// picture at all. A file that's missing or won't decode is named by Check() at load,
+    /// and its tile falls back to the label.
+    /// </summary>
+    public string? Icon { get; set; }
+
+    /// <summary>
+    /// Where that picture goes: "left" of the label (the default — a small one, at text
+    /// height), "above" it (the picture takes the tile and the label sits under it), or
+    /// "fill" (the tile is the picture, and the label survives as its tooltip). The label
+    /// is what the tile is called whichever of these it is: it names the tile in the log,
+    /// to a tap from the tablet and to a screen reader, so "fill" is about what's drawn
+    /// and not about giving a button up as nameless.
+    ///
+    /// On an app tile the + is never a picture, whatever this says. It's the half that
+    /// opens another window, and it has to stay findable.
+    /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public IconMode IconMode { get; set; } = IconMode.Left;
 }
 
 public class SnippetEntry
@@ -210,6 +241,16 @@ public class SnippetEntry
 
     /// <summary>Accent for the tile's outline — see <see cref="AppEntry.Color"/>.</summary>
     public string? Color { get; set; }
+
+    /// <summary>A picture on the tile — see <see cref="AppEntry.Icon"/>.</summary>
+    public string? Icon { get; set; }
+
+    /// <summary>Where that picture goes — see <see cref="AppEntry.IconMode"/>.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public IconMode IconMode { get; set; } = IconMode.Left;
 }
 
 public enum InsertMethod { Paste, Type }
+
+/// <summary>How a tile draws its picture — see <see cref="AppEntry.IconMode"/>.</summary>
+public enum IconMode { Left, Above, Fill }

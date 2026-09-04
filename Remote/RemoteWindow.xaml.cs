@@ -13,10 +13,11 @@ namespace Deckhand;
 /// <summary>
 /// What remote mode looks like on this machine: where to reach the panel, and whether
 /// the tablet is getting through. It holds no tiles of its own — the panel behind it
-/// still owns all of those — so nothing here can act on the machine except ↻ and Quit.
+/// still owns all of those — so nothing here can act on the machine except ↻, Quit and
+/// the designer, which edits a file rather than the machine.
 ///
 /// It can be put away without stopping any of it: ✕ hides it to the notification area,
-/// where the icon carries the same status and the same two buttons. Quit is the only way
+/// where the icon carries the same status and the same buttons. Quit is the only way
 /// out, and RemoteWindow.Tray.cs is the rest of that story.
 /// </summary>
 public partial class RemoteWindow : Window
@@ -133,6 +134,7 @@ public partial class RemoteWindow : Window
         if (!status.Serving)
         {
             DetailText.Text = status.Error ?? "";
+            TabletText.Visibility = Visibility.Collapsed;
             WarningText.Visibility = Visibility.Collapsed;
             return;
         }
@@ -150,10 +152,24 @@ public partial class RemoteWindow : Window
                           + $"{status.Taps} tap{(status.Taps == 1 ? "" : "s")} so far"
                           + Screen(status.Screen);
 
-        // Ready is false here only because this window has focus: the panel's lock is
-        // the other cause, and in this mode it's not on screen to unlock.
-        WarningText.Text = "This window has focus, so taps are refused — a snippet would "
-                           + "be typed into it. Click back into your app.";
+        // Kept on screen once a page has said, rather than cleared when the tablet goes
+        // quiet: how big that tablet is doesn't stop being true between polls, and this is
+        // the line you read while typing the number into the designer.
+        if (status.Tablet is { } tablet)
+        {
+            TabletText.Text = Measured(tablet);
+            TabletText.Visibility = Visibility.Visible;
+        }
+
+        // Ready is false here only because one of our windows has focus: the panel's lock
+        // is the other cause, and in this mode it's not on screen to unlock. Which window
+        // it is matters to whoever has to click out of it — the refusal is per process, so
+        // the designer counts too.
+        WarningText.Text = _designer?.IsActive == true
+            ? "The designer has focus, so taps are refused — a snippet would be typed into "
+              + "the layout you're editing. Click back into your app."
+            : "This window has focus, so taps are refused — a snippet would "
+              + "be typed into it. Click back into your app.";
         WarningText.Visibility = status.Ready ? Visibility.Collapsed : Visibility.Visible;
     }
 
@@ -258,6 +274,25 @@ public partial class RemoteWindow : Window
         "none" => " · screen may sleep",
         _ => "",
     };
+
+    /// <summary>
+    /// The tablet's screen in one line: the box the page has to draw in, the smaller box
+    /// the tiles actually get once the page's own header is out of it, and how many device
+    /// pixels each of those pixels is worth — the last being why a tablet sold as 2560×1600
+    /// reports 1280×800 and is right to.
+    ///
+    /// The tiles pair is named for the designer, because it is the pair to type into it:
+    /// the designer's preview is the tile grid and nothing around it.
+    /// </summary>
+    private static string Measured(TabletScreen tablet)
+    {
+        string ratio = tablet.Ratio > 1 ? $", {tablet.Ratio:0.##}× pixels" : "";
+        string tiles = tablet.TilesWidth is { } width && tablet.TilesHeight is { } height
+            ? $" · tiles {width}×{height}, which is what the designer's screen size wants"
+            : "";
+
+        return $"tablet screen {tablet.Width}×{tablet.Height}{ratio}{tiles}";
+    }
 
     private static string Ago(TimeSpan span) =>
         span.TotalMinutes < 1 ? $"{span.TotalSeconds:0} seconds"
@@ -434,6 +469,78 @@ public partial class RemoteWindow : Window
         Refresh();
     }
 
+    /// <summary>
+    /// The designer while it is open, and null the rest of the time. One at a time: two
+    /// of them would be two models of the same file, and whichever saved second would
+    /// quietly throw away the other's work.
+    /// </summary>
+    private DesignerWindow? _designer;
+
+    private void Design_Click(object sender, RoutedEventArgs e) => Design();
+
+    /// <summary>
+    /// Opens the layout designer — the same window --designer starts with, only here it
+    /// isn't the whole app. Reachable from this window because in this mode the panel
+    /// being designed isn't on any screen to right-click, and from the icon's menu for
+    /// the same reason twice over.
+    ///
+    /// Nothing stops while it's open: the tablet stays paired, and a save arrives at the
+    /// panel through the config watcher as an ordinary reload — so the layout appears on
+    /// the tablet as it's being built. Taps are refused while the designer has focus,
+    /// for the reason they're refused while this window has it: a snippet typed into
+    /// whatever field is focused there would be typed into the config being written. The
+    /// tablet says so when it happens.
+    /// </summary>
+    private void Design()
+    {
+        if (_designer is { } open)
+        {
+            // Already open, and possibly behind this window or minimized — which
+            // Activate on its own doesn't undo.
+            if (open.WindowState == WindowState.Minimized) open.WindowState = WindowState.Normal;
+            open.Activate();
+            return;
+        }
+
+        var designer = new DesignerWindow(OpenAt());
+        _designer = designer;
+
+        // Closed rather than Closing: its ✕ can be cancelled by the unsaved-work question,
+        // and forgetting it at that point would let a second one open over the first.
+        designer.Closed += (_, _) => _designer = null;
+
+        designer.Show();
+
+        // Opened from the icon's menu, this process isn't the foreground one — the click
+        // that opened the menu went to the shell — so Show alone can leave the designer
+        // behind whatever is. Best effort, which is all Windows grants here.
+        designer.Activate();
+    }
+
+    /// <summary>
+    /// What screen to open the designer's preview at: the box the tablet is drawing its
+    /// tiles in, as the page last measured it. That's the number nobody can look up — it
+    /// isn't the tablet's advertised resolution, and it isn't the browser's window either
+    /// — so having asked for it, this is where it earns its keep.
+    ///
+    /// Only the tiles pair will do. Before the tablet is past the token box there is no
+    /// tile grid to have measured, and the viewport in its place would be wrong by the
+    /// page's own header: a number that looks authoritative and quietly isn't is worse
+    /// than the size the designer was last left at, which is what null falls back to.
+    /// </summary>
+    private DesignerScreen? OpenAt()
+    {
+        if (_panel.Status().Tablet is not { TilesWidth: { } width, TilesHeight: { } height })
+        {
+            return null;
+        }
+
+        return new DesignerScreen(width, height,
+            $"Filled in from the tablet: {width}×{height} is the box its tiles are drawn in "
+            + "there, as the page last measured it. Change them, or clear both to fill the "
+            + "pane instead.");
+    }
+
     private void Quit_Click(object sender, RoutedEventArgs e) => Quit();
 
     /// <summary>
@@ -442,6 +549,16 @@ public partial class RemoteWindow : Window
     /// </summary>
     private void Quit()
     {
+        // The designer answers for its own unsaved work first. Asking during the shutdown
+        // would be too late — that closes windows whether or not they wanted closing — and
+        // Cancel there has to mean cancelling the quit, since the alternative is losing the
+        // layout to a button in another window.
+        if (_designer is not null)
+        {
+            _designer.Close();
+            if (_designer is not null) return;   // the question was answered Cancel
+        }
+
         _quitting = true;
         Close();
     }

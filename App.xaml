@@ -130,17 +130,18 @@
         </Style>
 
         <!--
-            The notification area's menu — the one behind a right-click on the tray icon,
-            while the remote window is hidden.
+            A dark drop-down menu, used by the tray icon behind a right-click on it and by
+            the designer's FOCUSED button. Named for what it is rather than for the first
+            thing that wanted it: both are a plain list of one-line commands.
 
             Templated rather than styled, both of them. The stock MenuItem paints its own
             highlight from a trigger inside its template, which no Setter out here can
             reach, so a plain style produces a dark menu with a light blue hover in it; and
             the stock ContextMenu keeps a lighter gutter down the left for icons and
-            checkmarks that nothing here has. Neither template needs to do more than the
-            menu actually uses: one line of content, no submenus, no icons.
+            checkmarks that nothing here has. Neither template needs to do more than these
+            menus actually use: one line of content, no submenus, no icons.
         -->
-        <Style x:Key="TrayMenu" TargetType="ContextMenu">
+        <Style x:Key="DarkMenu" TargetType="ContextMenu">
             <Setter Property="Background" Value="#252526"/>
             <Setter Property="BorderBrush" Value="#3F3F46"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -161,7 +162,7 @@
             </Setter>
         </Style>
 
-        <Style x:Key="TrayMenuItem" TargetType="MenuItem">
+        <Style x:Key="DarkMenuItem" TargetType="MenuItem">
             <Setter Property="Foreground" Value="#EAEAEA"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="14,7"/>
@@ -184,7 +185,7 @@
 
         <!-- Applied to the Separator by name: a menu otherwise styles its own separators
              from the theme, and that one is a light line. -->
-        <Style x:Key="TrayMenuLine" TargetType="Separator">
+        <Style x:Key="DarkMenuLine" TargetType="Separator">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">

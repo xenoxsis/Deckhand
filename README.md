@@ -65,12 +65,13 @@ must itself run elevated to debug with F5.
 
 ## Where the code lives
 
-One project, four folders, and a root that holds only what has to be there:
+One project, five folders, and a root that holds only what has to be there:
 
 | | |
 |---|---|
-| `Config/` | `dashboard.json` as objects, and the reading, merging and checking of it — plus the folder scan a `source` section is built from. Deliberately free of WPF and Win32, which is what lets the loader be compiled into a plain console project and tested without a screen. |
+| `Config/` | `dashboard.json` as objects, and the reading, merging, checking and (for the designer) writing of it — plus the folder scan a `source` section is built from, and the tile pictures. Free of WPF and Win32 but for `TileImages.cs`, which reads and decodes those pictures and so needs both a decoder and, for an svg, the drawing package: a picture is checked as part of loading a config, because a missing one belongs in the same list of warnings as a missing profile. |
 | `Panel/` | The panel window: placing sections on the grid, building tiles, what a tap does, and the chrome around the edge. |
+| `Designer/` | The layout designer: the editing window, and a preview that draws a config with the panel's own placer and styles but none of its behaviour. |
 | `Remote/` | The tablet's side: the HTTP server, the records it serializes, the status window and its notification-area icon, and `Remote/Web/` — the page a browser is served, which the csproj embeds from there. |
 | `Interop/` | Everything said to Windows directly: the P/Invokes, the foreground hook, the window list, and the URL and de-elevated launchers. |
 | the root | Startup (`App`, `ModeWindow`), the two small types both halves share, and the files the build and the config are addressed by name: `dashboard.example.json`, the schema, `icon.ico`, `icon.ps1`. |
@@ -93,14 +94,35 @@ On start the dashboard asks where you want it:
 - **On a tablet** — nothing on this screen but a small ordinary window, with the panel
   itself served to the tablet's browser. See
   [The panel on a tablet](#the-panel-on-a-tablet).
+- **Design the layout** — no panel at all: a window for building `dashboard.json`
+  without typing it. Pick the grid, add groups and buttons, and a live preview draws
+  the panel as you go — the same placer and the same styles as the real thing, minus
+  the tapping. Set a screen size (a tablet's, say) above the preview and it's laid out
+  at exactly those pixels, shrunk to fit the window — and opened from the tablet-mode
+  window, both boxes are already filled in with what that tablet reported. **FOCUSED**
+  beside them draws the panel as it would look with a given app in front: every group at
+  once while you build, or one profile's worth, or only the groups that are always there.
+  A button can wear a picture too: **PICTURE** takes a path, or picks one with `…` — which
+  copies the file in beside the config, so a layout and its artwork stay together — and
+  the line under it says which file the path actually found and what was done with it.
+  Worth saying, because a relative path is relative to the file being saved rather than to
+  anything on screen. The three placements sit under it, and the preview draws the picture
+  where the panel will. Saving writes the file fresh
+  through the same model the panel loads, keeping the parts the designer doesn't edit
+  — profiles, the `remote` block, a section's folder `source` — but not comments,
+  which it asks about before overwriting a file that has any. A running panel notices
+  the save and redraws itself — including a panel being served to a tablet, which is
+  why **Design** is also a button on
+  [the tablet-mode window](#what-remote-mode-looks-like-on-the-laptop) rather than only
+  a mode of its own.
 
-The question is only asked when there's something to choose between: with
-`remote.enabled: false` it goes straight to the panel, exactly as it did before there
-was a remote side at all. Closing the question without answering quits, rather than
-falling back to the panel — that would put a window on the screen you'd just decided
-against, in the corner it was last left in.
+Enter answers the question the usual way — the local panel — so the everyday start is
+still one keypress. Closing it without answering quits, rather than falling back to
+the panel — that would put a window on the screen you'd just decided against, in the
+corner it was last left in.
 
-`--local` and `--remote` answer it in advance, which is what a pinned shortcut wants:
+`--local`, `--remote` and `--designer` answer it in advance, which is what a pinned
+shortcut wants:
 
 ```
 Start-Process bin\Debug\net9.0-windows\Deckhand.exe -ArgumentList --remote
@@ -117,8 +139,8 @@ The window is deliberately ordinary — movable, resizable, in the taskbar, and 
 the tablet is. It shows the addresses to open there — and the first of them as a QR, so
 setup is a scan rather than typing an IP on a tablet keyboard — the
 token (masked until **Show**), whether the tablet is getting through and who it is,
-whether that tablet is managing to keep its own screen on, and a log of everything that
-passed between the two sides.
+whether that tablet is managing to keep its own screen on, how big that tablet's screen
+turned out to be, and a log of everything that passed between the two sides.
 
 The QR follows **Show**: masked, it encodes only the address; with the token on screen it
 folds the token into the URL fragment too, and scanning is the whole setup — the page
@@ -130,6 +152,56 @@ can take the session. ↻ still unpairs too — restarting the server is what it
 also re-reads the config, and swapping tablets shouldn't have to mean that. Its size and position are
 remembered in `%LOCALAPPDATA%\Deckhand\remote-window.json`, separately from the
 panel's own.
+
+**Design** opens the layout designer beside this window — the same one `--designer`
+starts, only without it having to be the whole app. It's reachable from here because in
+this mode the panel being designed isn't on any screen to right-click; this window is
+what's on screen. Nothing stops while it's open: the tablet stays paired, and a save
+reaches the panel through the config watcher as an ordinary reload, so the layout appears
+on the tablet as you arrange it. One designer at a time, and closing it asks about
+unsaved work — **Quit** asks first too, and answering Cancel there cancels the quit
+rather than losing the layout to a button in another window. The same item is in the
+tray icon's menu, so putting this window away isn't a reason to have it back before
+reaching the layout.
+
+Opening it that way also fills in the designer's **SCREEN** boxes: the tiles pair from
+the tablet's last measurement, so the preview is at the size the tablet actually draws,
+without anyone reading a number off one window and typing it into another. The boxes say
+where the numbers came from if you hover them, and they're ordinary boxes — change them,
+or clear both to fill the pane. Nothing reported yet and the designer opens at the size
+it was last left at: a viewport figure in place of the tiles one would be wrong by the
+page's own header, and a number that looks authoritative and quietly isn't is worse than
+a remembered one.
+
+While the designer has focus, taps are refused for the reason they're refused while this
+window has focus: a snippet would be typed into whatever field is focused, which in the
+designer's case is part of the config being written. The tablet says so, and the line
+under the status dot says which of the two windows it is.
+
+**How big the tablet is, which is the one thing this end can't work out.** The panel is
+laid out for a screen nobody at the laptop can see, so the page measures its own and sends
+the answer with every request. The window shows it under the status line and the log writes
+a line each time it changes:
+
+```
+14:22:07  the tablet's screen is 1280×800 at 2× pixels, tiles 1264×744 — that pair is what the designer's screen size wants
+```
+
+Two boxes, because they answer different questions. **tablet screen** is the visible
+viewport: what the browser leaves the page once its own bars are counted, measured with
+`visualViewport` rather than guessed from a unit. **tiles** is what's left for the grid
+after the page's own header — and that is the pair to type into the designer's screen
+size, whose preview is the tile grid and nothing around it.
+
+All of it in CSS pixels, which is the unit the page lays out in and the unit the designer
+wants. The `2×` is how many device pixels each of those is worth: it's why a tablet sold
+as 2560×1600 reports 1280×800 and is right to. Rotating the tablet, or its browser bars
+sliding away, changes the numbers and writes another line.
+
+A page too old to send it leaves the line off rather than guessing, and a header that
+isn't two plausible pixel counts is dropped without being echoed anywhere — the same rule
+as the screen-wake header, and for the same reason: anything that gets past the token can
+send one, and the log is the only account of what happened here.
 
 `+` in the listen prefix isn't something anyone can type into a tablet, so it's expanded
 into this machine's addresses, interfaces with a default gateway first: a WSL, Hyper-V
@@ -165,9 +237,10 @@ machine — 16 pixels at 100%, 20 at 125%:
 - **Double-click** it to put the window back — without focus, same as when it first
   appeared, so the tablet keeps working while you read it.
 - **Right-click** it for that status line again with its coloured dot, then **Open the
-  dashboard**, **↻ Reload** and **Quit** — the same two buttons as the bottom of the
-  window, so re-reading the config or stopping the server doesn't need the window back
-  first.
+  dashboard**, **Design the layout**, **↻ Reload** and **Quit** — the same buttons as the
+  bottom of the window, so re-reading the config, building a layout or stopping the
+  server doesn't need the window back first. The designer opens on its own; the status
+  window stays where you put it.
 
 The icon exists only while the window is hidden; on screen the window has a taskbar
 button, and the same window listed twice is one listing more than is useful.
@@ -204,9 +277,10 @@ left running with nothing on screen to stop it. Quitting saves the window's posi
 `RestoreBounds` when it isn't `Normal`, since a hidden or minimized window's plain
 `Left`/`Top` describe a geometry it isn't using.
 
-The menu is a WPF `ContextMenu` templated dark in `App.xaml` (`TrayMenu`, `TrayMenuItem`,
-`TrayMenuLine`) rather than a Win32 or WinForms one, so it matches the window it belongs
-to; a stock `MenuItem` paints its highlight from a trigger inside its own template, which
+The menu is a WPF `ContextMenu` templated dark in `App.xaml` (`DarkMenu`, `DarkMenuItem`,
+`DarkMenuLine`, shared with the designer) rather than a Win32 or WinForms one, so it
+matches the window it belongs to; a stock `MenuItem` paints its highlight from a trigger
+inside its own template, which
 no style out here can reach, so a plain dark style would give a dark menu with a light
 blue hover in it. It's placed at the cursor as an absolute point — a popup placed against
 this window would have to appear beside it, and it's hidden — and handed the foreground
@@ -343,7 +417,10 @@ clean, 1 when not, so a script can gate on it.
 
 One change ↻ can't show you: a section written for profiles is hidden unless one of
 them is the focused app, so editing it looks like nothing happened until you focus a
-window it's for.
+window it's for. The designer's **FOCUSED** button is the way to look at one without
+arranging for the right window to be in front — it draws the panel as it would be with
+that app focused, which is also how to see what a gated group does to the ones packed
+around it.
 
 The file itself is plain JSON with no comments in it — this section is the
 documentation. The loader does skip `//` comments and trailing commas, though, so
@@ -393,6 +470,80 @@ notes can be left inline where they'd help.
   tiles a colour is faster to hit than a label is to read. Longer WPF forms like
   `#AARRGGBB` are refused because a browser reads eight digits as RGBA — the two screens
   would disagree about what was written.
+- **Tile pictures** — an app or snippet tile takes `"icon"`, the path to a picture, and
+  `"iconMode"` saying where it goes on the tile: `"left"` of the label (the default — a
+  small one, at text height), `"above"` it (the picture takes the tile and the label sits
+  under it), or `"fill"`, where the tile *is* the picture and the label is kept as its
+  tooltip. The label never goes away whichever mode it is: it stays what the tile is
+  called in the log, in a tap from the tablet and to a screen reader. On an app tile the
+  `+` is never a picture — it's the half that opens another window, and on a pair whose
+  wide side has become a logo it's the only thing left with a shape to look for.
+
+  The path is absolute, or relative to `dashboard.json`'s own folder, with `%ENVVARS%`
+  expanded. Pick one with the designer's `…` and the file is **copied in** beside the
+  config — into a `pictures\` folder next to it — and what gets written is the relative
+  path, so a layout and its pictures stay one thing you can move. A pointer into a
+  downloads folder is a tile that breaks the day that folder is tidied, and it breaks
+  quietly.
+
+  Around that: a picture already under the config's folder is left exactly where it is,
+  wherever that is; one identical to a file already in `pictures\` is pointed at rather
+  than copied twice; a name taken by different content becomes `logo-2.png`; and a file
+  that can't be used isn't copied at all, so that folder never collects anything that
+  doesn't draw. A path typed by hand is left alone, which is right — sometimes a shared
+  folder is exactly what you meant.
+
+  png, jpg, gif, bmp, ico, webp and svg — the intersection of what this can draw and what
+  a browser can, because a picture only one of the two screens can show is a tile that
+  looks different on the tablet, and the preview exists to stop exactly that. tiff is the
+  one left out, and nothing over 2MB, since every picture is also sent over the air.
+
+  **svg** stays a drawing all the way to the tile rather than being flattened to pixels,
+  so it's sharp at whatever size the tile turns out to be — which is the reason to use one,
+  since everything else here is a fixed grid being scaled to fit. WPF has no svg decoder,
+  so this is the one format that needs a package to draw
+  ([SharpVectors](https://github.com/ElinamLLC/SharpVectors), BSD-3): a picture only the
+  tablet's browser could draw would have been a tile that looked different there, so it
+  was either the dependency or no svg at all.
+
+  An svg has to be **self-contained**, because an svg is a document and not a picture. One
+  that points at another file, declares entities, or carries `<script>`, a `<foreignObject>`
+  or an `on…` handler is refused at load with a line naming which of those it did. It may
+  point within itself (`#gradient`) and nowhere else: a relative path would be read from
+  beside the file here and from beside a blob URL on the tablet, which is to say drawn on
+  one screen and not the other. That is what keeps "nothing is fetched" true of a format
+  with its own opinions about it.
+
+  A picture carried inline (`data:…`) is refused too, for a duller reason: the drawing
+  package draws nothing for one while a browser draws it, so that tile would differ between
+  the two screens. Point the tile at the picture itself instead — that is what the six
+  raster formats are for. And one caveat survives all of it: text set in a font, since the
+  panel draws it with the font installed here and the tablet with whatever it has, so an
+  svg whose lettering was converted to outlines is the one that's the same picture on both.
+
+  webp is the one of those whose decoder Windows keeps optional — the Web Media Extensions
+  component, which a stock Windows 10 or 11 has and some Server and LTSC builds don't. A
+  machine without it says so in the load warning and the tile draws its label, on the
+  tablet as well as here: the panel is what publishes a picture at all, so one it can't
+  decode is never offered to the tablet, and the two screens still agree.
+
+  Windows' webp decoder also reports its frames as carrying no transparency when they
+  plainly do — the alpha is in the bytes, just not in the label — so a logo exported with
+  a transparent background would draw as a logo in a black box. The panel relabels those
+  frames rather than believing them, which is why a transparent webp looks like a
+  transparent png here. An opaque one is unaffected.
+
+  Nothing is extracted, guessed or fetched: a tile draws the file its config names and no
+  other. That keeps loading a config down to reading files that were asked for by name,
+  rather than "go and look inside that exe" or "ask that website for its favicon". A file
+  that is missing, too big, of the wrong type or simply not decodable is named at load
+  with the other config warnings, and its tile draws the label instead — on the panel, in
+  the designer's preview and on the tablet alike.
+
+  Pictures are read once and kept, keyed by the file and its timestamp: editing one in
+  place is picked up on the next redraw — a focus change, or ↻ — since the watcher watches
+  `dashboard*.json` and not the pictures beside it. The tablet follows for free, because
+  new bytes are a new hash and a hash it hasn't got is a hash it fetches.
 - **Folder sections** — a section with a `"source"` object gets one tile per
   subdirectory of `source.folders`, most recently used first. What a tile does is
   the `command` decision: with one, tapping types it into the focused window and
@@ -876,6 +1027,14 @@ have nothing else in it:
 - **Ids only.** No field anywhere carries a path, a command, or text to type. Ids are
   a hash of group, label and repeat, and only resolve against tiles that were on
   screen when the tablet last drew — `{"path":"…\\calc.exe"}` is a 400, not a launch.
+- **Pictures by content, never by path.** A tile's picture crosses as the hash of its own
+  bytes, and the request that comes back for it is answered out of the set the panel
+  published with those tiles — so there is no filename in it to sanitise, and nothing
+  outside that set to name. `/api/icon/../../dashboard.json` is a 404 for the same reason
+  `/api/icon/beef` is: neither is a key in the table, and the answer says "not on the
+  panel" rather than "no such file", which would be a way to ask this machine what it has.
+  The bytes sit behind the token like everything else, which is why the page fetches them
+  itself rather than leaving it to an `<img src>` — a browser won't put our header on one.
 - **A token on every call**, compared in constant time, minimum 16 characters. Without
   one the server refuses to start rather than listening open — and the startup question
   disables the tablet option and says why, rather than letting the choice be made and
@@ -1079,6 +1238,108 @@ with a 120px bottom bar simulated the grid ends 16px above it where the old rule
 104px of it underneath. The panel's own copy of that group was screenshotted alongside for
 comparison — it always drew the arrows beside the labels; only the page didn't.
 
+**Partly covered.** Both configurations compile clean, and three of the newer pieces were
+checked without a tablet in the room:
+
+- **The screen-size header.** The parser was driven through reflection on the built
+  assembly — the shipped method, not a copy — over 34 inputs: what the page sends with and
+  without the tiles box, a missing ratio, a comma decimal, a sign, an interior space, a
+  thousands separator, a capital `X`, pixel counts under 64 and over 20000, a ratio of 0
+  and of 99, a third field, a repeated one, `<script>` in place of a number, and 70 digits.
+  Every one of those was rejected — surrounding whitespace is the one thing tolerated — so
+  nothing but parsed integers can reach the log. The page's own `measured()` was then run
+  in a browser against the real `remote.html` — `532x682@1.25` at the token box,
+  `532x682@1.25 tiles=532x400` with the panel up — and both strings fed back through that
+  parser, which accepted them and rendered the window's line. What has *not* been run is a
+  real tablet reporting to a real server, or the log line's once-per-change rationing.
+- **FOCUSED.** `DesignerPreview.Build` was driven, again by reflection on the built
+  assembly, over a four-group throwaway config — two always on, one for a "VS Code"
+  profile, one for "Outlook" — with each of the four lenses, and the group headers read
+  back out of the visual tree it returned: every group, then the two ungated ones for
+  "nothing focused", then each profile's own three. Each was also rendered to a PNG and
+  looked at, which is what confirms the part worth having: the remaining groups really do
+  grow and move up into the dropped one's cells, exactly as the panel packs them.
+- **The Design button** and its tray-menu twin: the mode-switch runs above exercise the
+  designer window itself, from `--designer`, but not opening it from the remote window —
+  the one designer at a time, the unsaved-work question in front of **Quit**, and the
+  taps-refused line naming the designer. The window it opens was built in a harness and
+  measured, which settles the two things a picture can settle: the tablet's size arrives
+  in the SCREEN boxes with the tooltip saying where it came from, and the FOCUSED button
+  and its caption fit beside them at the window's narrowest. The three menu styles it
+  looks up by name are asserted present, since `FindResource` throws when they aren't.
+  Nobody has yet clicked the menu itself open.
+- **Tile pictures.** The loader — `TileImages`, by reflection on the built assembly, so
+  the shipped code and not a copy — over twelve icon paths: three real pictures, a 3MB
+  file, a png that isn't one, an svg, a missing file, a directory, an absolute path, one
+  with `%WINDIR%` in it, one padded with spaces, and none at all. Each came back either
+  accepted with its hash, type and pixel size, or refused with the line the config
+  warnings then carry. `DesignerPreview.Build` was run over a config using all three
+  placements, rendered to a PNG and looked at: the pictures land where they should, a wide
+  one is bounded rather than squeezing its label out of the cell, and all three unusable
+  files fall back to their labels.
+
+  The tablet's half was run for real, without a tablet: a server on loopback, a published
+  snapshot carrying the three placements plus a joined `+` pair, and the page itself in a
+  browser with the token typed in. It drew all three, fetched each picture exactly once —
+  three requests for four tiles wearing three pictures — and the tile whose hash the
+  server didn't have showed its label rather than sitting there blank, which is what the
+  first look at it caught. Against that same server: `/api/icon/<hash>` 200 with the right
+  content type and byte count, an unknown hash 404, no token 401, and five shapes of
+  traversal — `../`, `..%2f`, a hash with `/../` after it, a relative path and an absolute
+  Windows one — all 404, none of them reaching a file. What has *not* been run is a real
+  tablet, or a picture being edited on disk while the panel is up.
+
+  The designer was driven as well: the window built, a config with pictures loaded into
+  it, a button selected, and then the **PICTURE** box, the line under it and the three
+  placement buttons read back — a path that finds nothing turns that line into the reason
+  — with the editing column rendered and looked at to see that it all fits. `ConfigWriter`
+  was made to write that config back out and the file read in again, thirteen tiles and
+  three placements out and back unchanged, because a save that quietly dropped the
+  pictures is the expensive kind of bug.
+
+  webp was added afterwards and checked the same way, over two real files — a lossless
+  Chrome logo with transparency and an opaque photo, both straight out of a Downloads
+  folder. Both decode here, this machine having the optional component, and rendering them
+  in all three placements is what caught the alpha: the logo came out in a black box until
+  the frames were relabelled, and the file's own header says `alpha_is_used`, so the box
+  was ours and not the picture's. An anti-aliased edge pixel settled premultiplied versus
+  straight. What has *not* been run is a machine lacking the decoder — that path is the
+  ordinary "couldn't be decoded" one, with a line naming the component to install.
+
+  svg came last and needed its own set, since an svg is a document: ten files through the
+  real loader — a gradient icon, one with text, one carrying an inline `data:` picture, one
+  pointing at `http://`, one at a relative path, one with `url(https://…)` inside a style
+  attribute, one with `<script>`, one with an `onload`, an entity-expanding DOCTYPE, and a
+  truncated file. The two icons were accepted as drawings and the other eight refused, each
+  with the line saying which of those it did. The `data:` one is why that case is refused
+  rather than allowed: the file's own base64 is a valid 16×16 png, and the drawing package
+  silently draws nothing for it while a browser draws it — so allowing it would have been
+  the one thing all this is meant to prevent, a tile that differs between the screens.
+
+  Then both screens, side by side: the three placements rendered from an svg and looked at,
+  and the same three served to a browser over the real endpoint as `image/svg+xml` and
+  looked at there. Sharp on both. What has *not* been run is a font-dependent svg on a
+  tablet that lacks the font — the case the caveat above is about.
+
+  The label plumbing has a fallback in it for a reason, found by using the thing: reading
+  only the automation name blanked the picker's **Cancel** on the tablet — the one tile on
+  that card declared in XAML rather than built by `MakeTile`, so the one tile without a
+  name to read. It drew "Cancel" on the laptop the whole time, which is exactly why it
+  needed catching from the other screen. `LabelOf` now reads the name first and the text
+  second, and was checked over six kinds of tile: XAML with and without a name, a built
+  label, a built picture with no text at all, a two-line folder label, and a button with
+  nothing on it.
+
+  Copy-into-place came after the rest and was driven through the designer's own method on
+  the built window, over eight picks: one from outside the config's folder into a
+  `pictures\` folder that didn't exist yet, the same file again, a different picture
+  sharing its name, two already under the folder, and three that can't be used at all — a
+  text file, an svg carrying script, and a path to nothing. The folder ended with exactly
+  two files and no duplicate bytes; the three unusable ones were written as the paths they
+  are and copied nowhere. The failure branch was exercised by pointing the designer at a
+  config whose folder is a file, so the copy can't be made: the absolute path is written
+  and the line under the box turns red and says why.
+
 ## Resizing
 
 Drag the grip in the bottom-right corner. The size is saved to
@@ -1259,6 +1520,9 @@ the keystrokes to itself.
 MIT — see [LICENSE](https://github.com/xenoxsis/Deckhand/blob/main/LICENSE). Do what
 you like with it; keep the copyright notice.
 
-The one dependency, [QRCoder](https://github.com/codebude/QRCoder), is MIT too. If
-you redistribute a built copy rather than the source, put its license file in the
-archive alongside this one.
+Two dependencies come with it: [QRCoder](https://github.com/codebude/QRCoder), which
+encodes the QR in the status window, is MIT, and
+[SharpVectors](https://github.com/ElinamLLC/SharpVectors), which draws an svg on a tile,
+is BSD-3-Clause. If you redistribute a built copy rather than the source, put both their
+license files in the archive alongside this one — BSD-3 asks for its notice and its
+no-endorsement clause to travel with the binaries.

@@ -149,6 +149,28 @@
   */
   #panel.lost .tiles button, #modal.lost button { opacity: .4; pointer-events: none; }
 
+  /*
+    A tile wearing a picture. Three arrangements, the same three the panel draws and the
+    same three words the config spells: beside the label, above it, or the picture on its
+    own with the label kept as the tooltip.
+
+    The sizes are bounds rather than sizes. A picture keeps its own shape and is only
+    stopped from deciding how tall a row of tiles is, or from squeezing the label it
+    belongs to out of a narrow cell — which is the same pair of limits the panel puts on it.
+  */
+  button.faced { display: flex; align-items: center; justify-content: center; gap: 8px; }
+  button.faced.above, button.faced.fill { flex-direction: column; gap: 6px; }
+  button.faced img { object-fit: contain; min-width: 0; }
+  /* A box the size of the + on an app tile, at text height: a square icon fills it and
+     a wide one is letterboxed in it, which is the bound the panel puts on it too. */
+  button.faced.left img { flex: none; max-width: 44px; height: 22px; }
+  button.faced.left span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  button.faced.above img { max-width: 100%; max-height: 64px; }
+  button.faced.fill img { max-width: 100%; max-height: 88px; }
+  /* Before it has arrived, and for good if it never does: a tile with its label and no
+     hole where the picture was going to be. */
+  button.faced img:not([src]) { display: none; }
+
   #gate { padding: 40px 24px; max-width: 420px; margin: 0 auto; }
   #gate p { color: var(--dim); font-size: 14px; }
   #gate input {
@@ -447,12 +469,38 @@ function letSleep() {
   sayScreen("", "", "");
 }
 
+// ---- how big this screen is ---------------------------------------------
+
+// The laptop can't measure this end, and the panel it sends is laid out for it — so the
+// size goes up with every request and the status window says it out loud. Which answers
+// the question you can't answer by looking at a tablet: what to set the designer's
+// screen size to.
+//
+// CSS pixels, which is what the page lays out in; the ratio says how many real pixels
+// each one is, and is why a tablet sold as 2560x1600 measures 1280x800. Two boxes,
+// because they are different questions: the viewport is what the browser leaves the
+// page, and #groups is what is left for the tiles after the page's own header — the
+// second being the one the designer's preview corresponds to.
+function measured() {
+  const box = seen || { width: innerWidth, height: innerHeight };
+  const ratio = Math.round((devicePixelRatio || 1) * 100) / 100;
+  let header = `${Math.round(box.width)}x${Math.round(box.height)}@${ratio}`;
+
+  // Zero while the page is still at the token box, with no tiles laid out to measure.
+  const tiles = groupsEl.getBoundingClientRect();
+  if (tiles.width >= 64 && tiles.height >= 64) {
+    header += ` tiles=${Math.round(tiles.width)}x${Math.round(tiles.height)}`;
+  }
+
+  return header;
+}
+
 // ---- talking to the laptop ----------------------------------------------
 
 async function api(path, options = {}) {
   const headers = Object.assign(
     { "X-Dashboard-Token": token, "X-Dashboard-Screen": screenState,
-      "X-Dashboard-Device": device },
+      "X-Dashboard-Device": device, "X-Dashboard-Viewport": measured() },
     options.headers || {});
   const response = await fetch(path, Object.assign({}, options, { headers, cache: "no-store" }));
   if (response.status === 401) {
@@ -567,6 +615,81 @@ if ("serviceWorker" in navigator) {
 
 // ---- drawing ------------------------------------------------------------
 
+/*
+  The pictures the tiles wear, by the hash the snapshot named them by. Content-addressed,
+  so an entry can never go stale — a different picture is a different hash, and so a
+  different key — and one fetch serves every redraw, of which there is one per tap.
+
+  Fetched by hand rather than left to an <img src>, because the bytes are behind the token
+  like everything else here and an img can't be made to send a header. What the tag gets
+  is an object URL over a blob this page already holds. Those are never revoked: a panel
+  wears a handful of pictures and wants them all again on the next snapshot.
+*/
+const pictures = new Map();
+
+function picture(hash) {
+  const held = pictures.get(hash);
+  if (held) return held;
+
+  const fetching = (async () => {
+    try {
+      const response = await api(`/api/icon/${encodeURIComponent(hash)}`);
+      if (!response.ok) throw new Error(String(response.status));
+      return URL.createObjectURL(await response.blob());
+    } catch (error) {
+      // The tile keeps its label, which is what the laptop does with a picture it can't
+      // read either. Not worth a toast: there is nothing to do about it from this end.
+      pictures.delete(hash);
+      return null;
+    }
+  })();
+
+  pictures.set(hash, fetching);
+  return fetching;
+}
+
+/*
+  What one tile has on it. The label is set whatever else happens — a tile whose face is
+  the picture keeps it as the tooltip and as the name a screen reader reads, which is also
+  what the laptop calls that tile in its log — so nothing here can draw a button with no
+  name on it at all.
+
+  The picture arrives after the tile does, since it takes a request of its own. Until it
+  lands, and for good if it never does, the tile is what it would have been without one.
+*/
+function face(button, tile) {
+  if (!tile.icon) {
+    button.textContent = tile.label;
+    return;
+  }
+
+  button.title = tile.label;
+  button.setAttribute("aria-label", tile.label);
+
+  const img = document.createElement("img");
+  // Empty alt, not the label: on "fill" the picture *is* the label, and a screen reader
+  // reading both would say the tile twice.
+  img.alt = "";
+
+  button.classList.add("faced", tile.iconMode || "left");
+  button.append(img);
+
+  // The label as an element, so "fill" can leave it out and still have it to hand.
+  const caption = document.createElement("span");
+  caption.textContent = tile.label;
+  if (tile.iconMode !== "fill") button.append(caption);
+
+  picture(tile.icon).then((url) => {
+    if (url) { img.src = url; return; }
+
+    // It never arrived, and won't. The tile falls back to its label — which is what the
+    // laptop does with a picture it can't read — rather than sitting there as a button
+    // with nothing on it at all.
+    if (!caption.isConnected) button.append(caption);
+  });
+}
+
+
 function draw(snapshot) {
   if (outdated(snapshot.page)) return;
 
@@ -617,7 +740,7 @@ function draw(snapshot) {
 
     for (const tile of group.tiles) {
       const button = document.createElement("button");
-      button.textContent = tile.label;
+      face(button, tile);
       button.dataset.id = tile.id;
 
       // The tile's accent, painted where the panel paints it — on the outline.
@@ -683,7 +806,7 @@ function drawModal(overlay) {
 
   for (const tile of overlay.tiles) {
     const button = document.createElement("button");
-    button.textContent = tile.label;
+    face(button, tile);
     button.dataset.id = tile.id;
 
     // The way out goes under the list rather than at the end of it, so a long list can't

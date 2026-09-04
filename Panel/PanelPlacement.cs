@@ -27,6 +27,10 @@ internal sealed record PanelPlacement(double Left, double Top, double Width, dou
     /// </summary>
     public const string RemoteFile = "remote-window.json";
 
+    /// <summary>The designer window's placement — a third shape again, kept apart for
+    /// the same reason as the other two.</summary>
+    public const string DesignerFile = "designer-window.json";
+
     private static string PathOf(string file) =>
         System.IO.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

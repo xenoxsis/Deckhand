@@ -135,7 +135,10 @@ internal static class WindowCatalog
         // those does nothing anyone can see.
         if (Cloaked(hwnd)) return false;
 
-        return NativeMethods.GetWindowTitle(hwnd).Length > 0;
+        // Whitespace counts as untitled. A window called " " is one the picker would list
+        // as a blank row — the label is trimmed before it's drawn — and a row you can't
+        // read is worse than a window you can't reach from here.
+        return NativeMethods.GetWindowTitle(hwnd).Trim().Length > 0;
     }
 
     private static bool Cloaked(IntPtr hwnd) =>

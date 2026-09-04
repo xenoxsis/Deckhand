@@ -98,18 +98,27 @@ public class DashboardConfig
             }
         }
 
-        // Tile colours, before they reach a brush: an unparseable one is silently
-        // unpainted at render time, which looks like the config being ignored.
+        // Tile faces, before they reach a brush or a decoder: a colour that won't parse
+        // goes unpainted at render time and a picture that isn't there goes undrawn, and
+        // both of those look like the config being ignored.
         foreach (var section in EffectiveSections())
         {
-            var tiles = section.Apps.Select(a => (a.Label, a.Color))
-                        .Concat(section.Snippets.Select(s => (s.Label, s.Color)));
-            foreach (var (label, color) in tiles)
+            var tiles = section.Apps.Select(a => (a.Label, a.Color, a.Icon))
+                        .Concat(section.Snippets.Select(s => (s.Label, s.Color, s.Icon)));
+            foreach (var (label, color, icon) in tiles)
             {
                 if (color is not null && !ValidColor(color))
                 {
                     Warnings.Add($"Tile \"{label}\" has the color \"{color}\", which "
                                  + "isn't #RGB or #RRGGBB — it won't be painted.");
+                }
+
+                // Reads and decodes the file, which also warms it for the render that
+                // follows: this runs once per load, and the tiles are about to want it.
+                if (TileImages.Problem(SourceFolder, icon) is { } problem)
+                {
+                    Warnings.Add($"Tile \"{label}\" asks for a picture and {problem}. "
+                                 + "It will draw its label instead.");
                 }
             }
         }
@@ -196,6 +205,15 @@ public class DashboardConfig
     public string SourcePath { get; private set; } = "";
 
     /// <summary>
+    /// The folder that file sat in, which is what a tile's relative icon path is relative
+    /// to. Kept apart from SourcePath because that one is a sentence for the reload
+    /// tooltip — it reads "dashboard.json + dashboard.local.json" when both were used —
+    /// while this one has to stay a path.
+    /// </summary>
+    [JsonIgnore]
+    public string SourceFolder { get; private set; } = "";
+
+    /// <summary>
     /// Reads dashboard.json, with dashboard.local.json merged over it when one sits
     /// beside it — the shared file travels with the project, the local one holds this
     /// machine's overrides. <paramref name="error"/> comes back non-null when the
@@ -210,12 +228,7 @@ public class DashboardConfig
         string path = ResolvePath();
         if (!File.Exists(path)) return Ready(new DashboardConfig(), path);
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true,
-        };
+        var options = ReadOptions();
 
         GridRangeConverter.Problems.Clear();
 
@@ -288,6 +301,42 @@ public class DashboardConfig
     }
 
     /// <summary>
+    /// Reads one file by itself — no dashboard.local.json laid over it. This is the
+    /// designer's load: it rewrites the file it read, and a merged read would bake this
+    /// machine's overrides into the shared file the moment it was saved.
+    /// </summary>
+    public static DashboardConfig LoadFile(string path, out string? error)
+    {
+        error = null;
+        if (!File.Exists(path)) return Ready(new DashboardConfig(), path);
+
+        GridRangeConverter.Problems.Clear();
+
+        try
+        {
+            string text = File.ReadAllText(path);
+            var config = JsonSerializer.Deserialize<DashboardConfig>(text, ReadOptions())
+                         ?? new DashboardConfig();
+            NoteUnknownKeys(text, config, source: "");
+            return Ready(config, path);
+        }
+        catch (Exception ex) when (ex is JsonException or IOException)
+        {
+            error = $"{path}\n\n{ex.Message}";
+            return Ready(new DashboardConfig(), path);
+        }
+    }
+
+    /// <summary>How the file is read everywhere: comments and trailing commas are part
+    /// of the format, and keys match however they're capitalised.</summary>
+    private static JsonSerializerOptions ReadOptions() => new()
+    {
+        PropertyNameCaseInsensitive = true,
+        ReadCommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true,
+    };
+
+    /// <summary>
     /// The shared file with the local file's keys laid over it. Objects merge a level
     /// at a time; anything else — a value, a list — replaces outright, because half a
     /// list from each file would be impossible to reason about. Keys are matched
@@ -343,6 +392,7 @@ public class DashboardConfig
     private static DashboardConfig Ready(DashboardConfig config, string path)
     {
         config.SourcePath = path;
+        config.SourceFolder = Path.GetDirectoryName(path) ?? "";
         config.Remote.ResolveToken();
 
         // What the converter couldn't read, and what it left behind: a range that

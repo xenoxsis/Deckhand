@@ -1,0 +1,452 @@
+<!--
+    The layout designer: dashboard.json as a thing you arrange rather than type. The
+    left column is the editing — the grid, the groups, the buttons in the selected
+    group — and the right side is the panel as it will be drawn, rebuilt on every
+    change and clickable to select a group. An ordinary window like the chooser: it
+    exists instead of the panel, never alongside it, so none of the no-focus rules
+    apply here either.
+-->
+<Window x:Class="Deckhand.DesignerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Deckhand — designer"
+        Width="1180" Height="760" MinWidth="920" MinHeight="560"
+        ShowInTaskbar="True" WindowStartupLocation="CenterScreen"
+        Background="#1E1E1E" Foreground="#EAEAEA"
+        FontFamily="Segoe UI" FontSize="13"
+        PreviewKeyDown="Window_PreviewKeyDown">
+
+    <Window.Resources>
+
+        <!-- The dim little caption over each field, the same voice as the panel's
+             section headers. -->
+        <Style x:Key="FieldLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#8A8A8A"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,10,0,3"/>
+        </Style>
+
+        <!-- The hint under a field: what the value means, so the two spellings of a
+             range don't have to be remembered. -->
+        <Style x:Key="FieldHint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6A6A70"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,3,0,0"/>
+        </Style>
+
+        <!-- The stock TextBox template honours these brushes, so no retemplating —
+             a value the code can't read is flagged by turning BorderBrush red. -->
+        <Style x:Key="Input" TargetType="TextBox">
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="Foreground" Value="#EAEAEA"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="6,4"/>
+            <Setter Property="CaretBrush" Value="#EAEAEA"/>
+            <Setter Property="SelectionBrush" Value="#007ACC"/>
+        </Style>
+
+        <!-- Small square button: steppers, the ↑ ↓ ✕ on a list row, Browse…. Its own
+             template because TileButton's content margin is sized for a finger. -->
+        <Style x:Key="MiniButton" TargetType="Button">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Width" Value="26"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#EAEAEA"/>
+            <Setter Property="Background" Value="#2D2D30"/>
+            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="3,0,0,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1" CornerRadius="6">
+                            <!-- Padding rather than a margin in here, so a button with
+                                 words on it can be given room without every ± button
+                                 growing too: those leave Padding at 0. -->
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#007ACC"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#007ACC"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- One row of the group and button lists: left-aligned, quiet until hovered.
+             The code paints Background to mark the selected one. -->
+        <Style x:Key="RowButton" TargetType="Button">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Foreground" Value="#EAEAEA"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                CornerRadius="6" Padding="8,4">
+                            <ContentPresenter HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#37373D"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- One colour on the accent row. Background is the swatch itself. -->
+        <Style x:Key="Swatch" TargetType="Button">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="24"/>
+            <Setter Property="Margin" Value="0,0,5,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}"
+                                BorderBrush="#3F3F46" BorderThickness="1" CornerRadius="5"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#EAEAEA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <DockPanel Margin="14,12,14,12">
+
+        <!-- The way in and out of the file, and where it stands. -->
+        <Grid DockPanel.Dock="Bottom" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="StatusText" Grid.Column="0" Foreground="#8A8A8A" FontSize="12"
+                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="2,0,10,0"/>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Content="Open…" Style="{StaticResource TileButton}"
+                        MinWidth="86" MinHeight="40" FontSize="14" Click="Open_Click"/>
+                <Button Content="Save" Style="{StaticResource TileButton}"
+                        ToolTip="Write the layout to the file named on the left (Ctrl+S). A running panel re-reads it by itself."
+                        MinWidth="86" MinHeight="40" FontSize="14" Click="Save_Click"/>
+                <Button Content="Save As…" Style="{StaticResource TileButton}"
+                        MinWidth="98" MinHeight="40" FontSize="14" Click="SaveAs_Click"/>
+            </StackPanel>
+        </Grid>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="336"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ================= the editing column ================= -->
+            <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="2,0,10,0">
+
+                    <TextBlock Text="GRID" Style="{StaticResource FieldLabel}" Margin="0,0,0,3"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Columns" Foreground="#B6B6BC" VerticalAlignment="Center"/>
+                        <Button Content="−" Style="{StaticResource MiniButton}" Margin="8,0,0,0" Click="GridColumnsDown_Click"/>
+                        <TextBox x:Name="GridColumnsBox" Style="{StaticResource Input}" Width="42"
+                                 TextAlignment="Center" Margin="3,0,0,0" TextChanged="GridColumns_Changed"/>
+                        <Button Content="+" Style="{StaticResource MiniButton}" Click="GridColumnsUp_Click"/>
+
+                        <TextBlock Text="Rows" Foreground="#B6B6BC" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                        <Button Content="−" Style="{StaticResource MiniButton}" Margin="8,0,0,0" Click="GridRowsDown_Click"/>
+                        <TextBox x:Name="GridRowsBox" Style="{StaticResource Input}" Width="42"
+                                 TextAlignment="Center" Margin="3,0,0,0" TextChanged="GridRows_Changed"/>
+                        <Button Content="+" Style="{StaticResource MiniButton}" Click="GridRowsUp_Click"/>
+                    </StackPanel>
+                    <TextBlock Style="{StaticResource FieldHint}"
+                               Text="What the panel is divided into. Groups claim rectangles of these cells."/>
+
+                    <TextBlock Text="GROUPS" Style="{StaticResource FieldLabel}" Margin="0,16,0,3"/>
+                    <StackPanel x:Name="SectionList"/>
+                    <Button Content="＋ Add a group" Style="{StaticResource TileButton}"
+                            MinHeight="34" MinWidth="0" FontSize="13" Margin="0,6,0,0"
+                            HorizontalAlignment="Left" Click="AddSection_Click"/>
+
+                    <!-- Everything below is about the selected group, so it only
+                         exists while one is selected. -->
+                    <StackPanel x:Name="SectionEditor" Visibility="Collapsed">
+
+                        <Border Height="1" Background="#3F3F46" Margin="0,16,0,0"/>
+
+                        <TextBlock Text="GROUP" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="SectionLabelBox" Style="{StaticResource Input}"
+                                 TextChanged="SectionLabel_Changed"/>
+
+                        <Grid Margin="0,4,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="COLUMNS" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="SectionColumnsBox" Style="{StaticResource Input}"
+                                         TextChanged="SectionColumns_Changed"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="ROWS" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="SectionRowsBox" Style="{StaticResource Input}"
+                                         TextChanged="SectionRows_Changed"/>
+                            </StackPanel>
+                            <StackPanel Grid.Column="4">
+                                <TextBlock Text="TILES PER ROW" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="SectionPerRowBox" Style="{StaticResource Input}"
+                                         TextChanged="SectionPerRow_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Style="{StaticResource FieldHint}"
+                                   Text="A width like 3 packs the group into the first gap that fits; a range like 1-3 pins it to those cells. Columns left blank makes a full-width group whose tiles flow; rows left blank is one row. Tiles per row left blank is the group's width."/>
+
+                        <TextBlock Text="ONLY WITH THESE PROFILES" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="SectionProfilesBox" Style="{StaticResource Input}"
+                                 TextChanged="SectionProfiles_Changed"/>
+                        <TextBlock Style="{StaticResource FieldHint}"
+                                   Text="Profile labels, comma-separated — the group appears only while one of those apps is focused. Blank means always. Profiles themselves are written in dashboard.json."/>
+
+                        <TextBlock x:Name="SourceNote" Style="{StaticResource FieldHint}"
+                                   Foreground="#F0D68A" Visibility="Collapsed" Margin="0,10,0,0"
+                                   Text="This group also scans a folder into tiles. That part is kept as it is — the designer edits its placement and its own buttons; the scan itself is edited in dashboard.json."/>
+
+                        <TextBlock Text="BUTTONS" Style="{StaticResource FieldLabel}" Margin="0,14,0,3"/>
+                        <StackPanel x:Name="TileList"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                            <Button Content="＋ App" Style="{StaticResource TileButton}"
+                                    ToolTip="A button that launches a program, opens a folder, or opens a URL"
+                                    MinHeight="34" MinWidth="0" FontSize="13" Click="AddApp_Click"/>
+                            <Button Content="＋ Snippet" Style="{StaticResource TileButton}"
+                                    ToolTip="A button that types or pastes text into the focused window"
+                                    MinHeight="34" MinWidth="0" FontSize="13" Click="AddSnippet_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- And this part is about the selected button. -->
+                    <StackPanel x:Name="TileEditor" Visibility="Collapsed">
+
+                        <Border Height="1" Background="#3F3F46" Margin="0,16,0,0"/>
+
+                        <TextBlock x:Name="TileKindLabel" Text="BUTTON" Style="{StaticResource FieldLabel}"/>
+                        <TextBox x:Name="TileLabelBox" Style="{StaticResource Input}"
+                                 TextChanged="TileLabel_Changed"/>
+
+                        <StackPanel x:Name="AppFields">
+                            <TextBlock Text="LAUNCHES" Style="{StaticResource FieldLabel}"/>
+                            <DockPanel>
+                                <Button Content="…" DockPanel.Dock="Right" Style="{StaticResource MiniButton}"
+                                        ToolTip="Pick a program" Click="BrowsePath_Click"/>
+                                <TextBox x:Name="TilePathBox" Style="{StaticResource Input}"
+                                         TextChanged="TilePath_Changed"/>
+                            </DockPanel>
+                            <TextBlock Style="{StaticResource FieldHint}"
+                                       Text="A program, a folder, or an http(s) URL — a URL opens as a browser tab."/>
+
+                            <TextBlock Text="ARGUMENTS" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TileArgsBox" Style="{StaticResource Input}"
+                                     TextChanged="TileArgs_Changed"/>
+                        </StackPanel>
+
+                        <StackPanel x:Name="SnippetFields">
+                            <TextBlock Text="TYPES THIS TEXT" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TileTextBox" Style="{StaticResource Input}"
+                                     AcceptsReturn="True" TextWrapping="Wrap" MinLines="2" MaxLines="6"
+                                     VerticalScrollBarVisibility="Auto"
+                                     TextChanged="TileText_Changed"/>
+                            <TextBlock Style="{StaticResource FieldHint}"
+                                       Text="{}{date}, {time} and {clipboard} are filled in at the moment of the tap."/>
+
+                            <TextBlock Text="HOW IT LANDS" Style="{StaticResource FieldLabel}"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="MethodPasteButton" Content="paste"
+                                        Style="{StaticResource MiniButton}" Width="64" Margin="0"
+                                        ToolTip="Via the clipboard and Ctrl+V — fast, but not every window maps Ctrl+V"
+                                        Click="MethodPaste_Click"/>
+                                <Button x:Name="MethodTypeButton" Content="type"
+                                        Style="{StaticResource MiniButton}" Width="64"
+                                        ToolTip="A character at a time — slower, leaves the clipboard alone, works in terminals"
+                                        Click="MethodType_Click"/>
+                            </StackPanel>
+
+                            <TextBlock Text="KEYS AFTER" Style="{StaticResource FieldLabel}"/>
+                            <TextBox x:Name="TileKeysBox" Style="{StaticResource Input}"
+                                     TextChanged="TileKeys_Changed"/>
+                            <TextBlock Style="{StaticResource FieldHint}"
+                                       Text="Pressed once the text has landed: tab, enter, escape — space or comma separated. Blank for none; enter is what makes a command run."/>
+                        </StackPanel>
+
+                        <!--
+                            A picture for the button, and where it goes on it. Outside both
+                            of the blocks above because it belongs to both kinds: an app
+                            button and a snippet button wear one the same way.
+
+                            The line under the box is the part that can't be typed blind.
+                            A relative path is relative to the file being saved, not to
+                            anything this window is standing in, so it says which file the
+                            path actually found — or why it found none.
+                        -->
+                        <TextBlock Text="PICTURE" Style="{StaticResource FieldLabel}"/>
+                        <DockPanel>
+                            <Button Content="…" DockPanel.Dock="Right" Style="{StaticResource MiniButton}"
+                                    ToolTip="Pick a picture" Click="BrowseIcon_Click"/>
+                            <TextBox x:Name="TileIconBox" Style="{StaticResource Input}"
+                                     TextChanged="TileIcon_Changed"/>
+                        </DockPanel>
+                        <TextBlock x:Name="IconNote" Style="{StaticResource FieldHint}"
+                                   Text="png, jpg, gif, bmp, ico, webp or svg — what the panel and the tablet can both draw. Pick one with … from anywhere and it's copied in beside the config, so the layout and its pictures stay one thing you can move."/>
+
+                        <!-- Only worth showing once there's a picture to place. -->
+                        <StackPanel x:Name="IconModes" Orientation="Horizontal" Margin="0,6,0,0"
+                                    Visibility="Collapsed">
+                            <Button x:Name="IconLeftButton" Content="left"
+                                    Style="{StaticResource MiniButton}" Width="60" Margin="0"
+                                    ToolTip="A small picture to the left of the label"
+                                    Click="IconLeft_Click"/>
+                            <Button x:Name="IconAboveButton" Content="above"
+                                    Style="{StaticResource MiniButton}" Width="60"
+                                    ToolTip="The picture takes the button, with the label underneath it"
+                                    Click="IconAbove_Click"/>
+                            <Button x:Name="IconFillButton" Content="fill"
+                                    Style="{StaticResource MiniButton}" Width="60"
+                                    ToolTip="The button is the picture. The label stays as its tooltip, and as what a tap and the log call it — an app button keeps its + either way."
+                                    Click="IconFill_Click"/>
+                        </StackPanel>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <TextBlock Text="SPAN" Style="{StaticResource FieldLabel}"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="−" Style="{StaticResource MiniButton}" Margin="0" Click="SpanDown_Click"/>
+                                    <TextBox x:Name="TileSpanBox" Style="{StaticResource Input}" Width="38"
+                                             TextAlignment="Center" Margin="3,0,0,0" TextChanged="TileSpan_Changed"/>
+                                    <Button Content="+" Style="{StaticResource MiniButton}" Click="SpanUp_Click"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Text="ACCENT" Style="{StaticResource FieldLabel}"/>
+                                <TextBox x:Name="TileColorBox" Style="{StaticResource Input}"
+                                         TextChanged="TileColor_Changed"/>
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Button Style="{StaticResource Swatch}" Background="#D16969" Tag="#D16969" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#CE9178" Tag="#CE9178" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#DCDCAA" Tag="#DCDCAA" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#6A9955" Tag="#6A9955" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#4EC9B0" Tag="#4EC9B0" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#9CDCFE" Tag="#9CDCFE" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#007ACC" Tag="#007ACC" Click="Swatch_Click"/>
+                            <Button Style="{StaticResource Swatch}" Background="#C586C0" Tag="#C586C0" Click="Swatch_Click"/>
+                            <Button Content="none" Style="{StaticResource MiniButton}" Width="46"
+                                    FontSize="11" Margin="3,0,0,0" Click="SwatchNone_Click"/>
+                        </StackPanel>
+                        <TextBlock Style="{StaticResource FieldHint}"
+                                   Text="Colours the tile's outline — #RGB or #RRGGBB. On a panel of identical tiles a colour is faster to hit than a label is to read."/>
+
+                    </StackPanel>
+
+                    <!-- Breathing room so the last field isn't against the edge. -->
+                    <Border Height="12"/>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- ================= the preview ================= -->
+            <DockPanel Grid.Column="2">
+                <DockPanel DockPanel.Dock="Top" Margin="2,0,2,6">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <TextBlock x:Name="PreviewSizeText" Foreground="#6A6A70" FontSize="11"
+                                   VerticalAlignment="Center" Margin="0,0,14,0"/>
+
+                        <!-- Which app to draw the panel as though it were focused. The
+                             panel picks that by watching the foreground window; nothing
+                             is focused here but this window, so it's chosen by hand. The
+                             caption is the state, so there's no tick in the menu. -->
+                        <TextBlock Text="FOCUSED" Foreground="#8A8A8A" FontSize="11"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <Button x:Name="FocusButton" Style="{StaticResource MiniButton}"
+                                Width="Auto" MinWidth="132" Padding="10,0" Margin="0"
+                                FontSize="11" HorizontalContentAlignment="Left"
+                                AutomationProperties.Name="Focused app"
+                                ToolTip="Draw the preview as the panel would with this app in front. Every group at once is the view for building — a group off screen can't be clicked to edit. A profile shows only what that app brings up, and Nothing focused only the groups that are always there."
+                                Click="Focus_Click"/>
+
+                        <TextBlock Text="SCREEN" Foreground="#8A8A8A" FontSize="11"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,6,0"/>
+                        <TextBox x:Name="ScreenWidthBox" Style="{StaticResource Input}" Width="48"
+                                 AutomationProperties.Name="Screen width"
+                                 TextAlignment="Center" Padding="4,2"
+                                 ToolTip="Preview the panel at this size in pixels, shrunk to fit this window. Blank both fields to fill the pane instead."
+                                 TextChanged="ScreenSize_Changed"/>
+                        <TextBlock Text="×" Foreground="#8A8A8A" FontSize="11"
+                                   VerticalAlignment="Center" Margin="4,0"/>
+                        <TextBox x:Name="ScreenHeightBox" Style="{StaticResource Input}" Width="48"
+                                 AutomationProperties.Name="Screen height"
+                                 TextAlignment="Center" Padding="4,2"
+                                 ToolTip="Preview the panel at this size in pixels, shrunk to fit this window. Blank both fields to fill the pane instead."
+                                 TextChanged="ScreenSize_Changed"/>
+                    </StackPanel>
+                    <TextBlock Text="PREVIEW — click a group to edit it."
+                               Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                </DockPanel>
+
+                <!--
+                    The panel's own chrome: same background, border and corner as
+                    MainWindow's shell, so what's inside reads as the real thing. The
+                    Viewbox is the screen-size trick: given a size, the shell is laid
+                    out at exactly those pixels and then scaled down — never up — to
+                    fit this pane, so the preview is the panel at that screen, zoomed
+                    out. With no size the shell is kept at the pane's own size, which
+                    makes the Viewbox a bystander at scale 1.
+                -->
+                <Grid x:Name="PreviewArea" SizeChanged="PreviewArea_SizeChanged">
+                    <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
+                        <Border x:Name="PreviewShell"
+                                Background="#1E1E1E" BorderBrush="#3F3F46" BorderThickness="1"
+                                CornerRadius="12" Padding="8">
+                            <ContentControl x:Name="PreviewHost" Focusable="False"/>
+                        </Border>
+                    </Viewbox>
+                </Grid>
+            </DockPanel>
+
+        </Grid>
+    </DockPanel>
+</Window>
