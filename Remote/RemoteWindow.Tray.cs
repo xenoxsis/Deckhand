@@ -10,8 +10,8 @@ namespace Deckhand;
 
 // Putting the status window away without stopping anything it does. ✕ hides it to the
 // notification area, where the icon carries the same dot, the same line of status and the
-// same two buttons. The window has to keep existing while it is hidden: it is the thing
-// the panel behind it is being watched through.
+// same buttons. The window has to keep existing while it is hidden: it is the thing the
+// panel behind it is being watched through.
 public partial class RemoteWindow
 {
     /// <summary>
@@ -97,9 +97,9 @@ public partial class RemoteWindow
     }
 
     /// <summary>
-    /// The icon's menu: the one thing this mode is watched for, and the two buttons from
-    /// the bottom of the window — so reloading or quitting doesn't need the window back
-    /// first.
+    /// The icon's menu: the one thing this mode is watched for, and the buttons from the
+    /// bottom of the window — so reloading, designing or quitting needn't bring the
+    /// window back first.
     /// </summary>
     private void ShowTrayMenu(Point at)
     {
@@ -148,20 +148,26 @@ public partial class RemoteWindow
         status.Children.Add(_trayDot);
         status.Children.Add(_trayLine);
 
-        var menu = new ContextMenu { Style = (Style)FindResource("TrayMenu") };
+        var menu = new ContextMenu { Style = (Style)FindResource("DarkMenu") };
 
         // Not a command — the top line of the menu. Hit testing and focus off, so it
         // neither lights up under the pointer nor takes an arrow key on the way past.
         menu.Items.Add(new MenuItem
         {
             Header = status,
-            Style = (Style)FindResource("TrayMenuItem"),
+            Style = (Style)FindResource("DarkMenuItem"),
             IsHitTestVisible = false,
             Focusable = false,
         });
 
-        menu.Items.Add(new Separator { Style = (Style)FindResource("TrayMenuLine") });
+        menu.Items.Add(new Separator { Style = (Style)FindResource("DarkMenuLine") });
         menu.Items.Add(TrayItem("Open the dashboard", FromTray));
+
+        // The designer opens without bringing this window back with it: it stands on its
+        // own, and having put the status window away is no reason to have it again in
+        // order to reach the layout.
+        menu.Items.Add(TrayItem("Design the layout", Design));
+
         menu.Items.Add(TrayItem("↻ Reload", Reload));
         menu.Items.Add(TrayItem("Quit", Quit));
 
@@ -170,7 +176,7 @@ public partial class RemoteWindow
 
     private MenuItem TrayItem(string label, Action click)
     {
-        var item = new MenuItem { Header = label, Style = (Style)FindResource("TrayMenuItem") };
+        var item = new MenuItem { Header = label, Style = (Style)FindResource("DarkMenuItem") };
         item.Click += (_, _) => click();
         return item;
     }

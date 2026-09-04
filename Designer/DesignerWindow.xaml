@@ -66,7 +66,11 @@
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="1" CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Padding rather than a margin in here, so a button with
+                                 words on it can be given room without every ± button
+                                 growing too: those leave Padding at 0. -->
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Margin="{TemplateBinding Padding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsPressed" Value="True">
@@ -303,6 +307,43 @@
                                        Text="Pressed once the text has landed: tab, enter, escape — space or comma separated. Blank for none; enter is what makes a command run."/>
                         </StackPanel>
 
+                        <!--
+                            A picture for the button, and where it goes on it. Outside both
+                            of the blocks above because it belongs to both kinds: an app
+                            button and a snippet button wear one the same way.
+
+                            The line under the box is the part that can't be typed blind.
+                            A relative path is relative to the file being saved, not to
+                            anything this window is standing in, so it says which file the
+                            path actually found — or why it found none.
+                        -->
+                        <TextBlock Text="PICTURE" Style="{StaticResource FieldLabel}"/>
+                        <DockPanel>
+                            <Button Content="…" DockPanel.Dock="Right" Style="{StaticResource MiniButton}"
+                                    ToolTip="Pick a picture" Click="BrowseIcon_Click"/>
+                            <TextBox x:Name="TileIconBox" Style="{StaticResource Input}"
+                                     TextChanged="TileIcon_Changed"/>
+                        </DockPanel>
+                        <TextBlock x:Name="IconNote" Style="{StaticResource FieldHint}"
+                                   Text="png, jpg, gif, bmp, ico, webp or svg — what the panel and the tablet can both draw. Pick one with … from anywhere and it's copied in beside the config, so the layout and its pictures stay one thing you can move."/>
+
+                        <!-- Only worth showing once there's a picture to place. -->
+                        <StackPanel x:Name="IconModes" Orientation="Horizontal" Margin="0,6,0,0"
+                                    Visibility="Collapsed">
+                            <Button x:Name="IconLeftButton" Content="left"
+                                    Style="{StaticResource MiniButton}" Width="60" Margin="0"
+                                    ToolTip="A small picture to the left of the label"
+                                    Click="IconLeft_Click"/>
+                            <Button x:Name="IconAboveButton" Content="above"
+                                    Style="{StaticResource MiniButton}" Width="60"
+                                    ToolTip="The picture takes the button, with the label underneath it"
+                                    Click="IconAbove_Click"/>
+                            <Button x:Name="IconFillButton" Content="fill"
+                                    Style="{StaticResource MiniButton}" Width="60"
+                                    ToolTip="The button is the picture. The label stays as its tooltip, and as what a tap and the log call it — an app button keeps its + either way."
+                                    Click="IconFill_Click"/>
+                        </StackPanel>
+
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -352,8 +393,22 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <TextBlock x:Name="PreviewSizeText" Foreground="#6A6A70" FontSize="11"
                                    VerticalAlignment="Center" Margin="0,0,14,0"/>
-                        <TextBlock Text="SCREEN" Foreground="#8A8A8A" FontSize="11"
+
+                        <!-- Which app to draw the panel as though it were focused. The
+                             panel picks that by watching the foreground window; nothing
+                             is focused here but this window, so it's chosen by hand. The
+                             caption is the state, so there's no tick in the menu. -->
+                        <TextBlock Text="FOCUSED" Foreground="#8A8A8A" FontSize="11"
                                    FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <Button x:Name="FocusButton" Style="{StaticResource MiniButton}"
+                                Width="Auto" MinWidth="132" Padding="10,0" Margin="0"
+                                FontSize="11" HorizontalContentAlignment="Left"
+                                AutomationProperties.Name="Focused app"
+                                ToolTip="Draw the preview as the panel would with this app in front. Every group at once is the view for building — a group off screen can't be clicked to edit. A profile shows only what that app brings up, and Nothing focused only the groups that are always there."
+                                Click="Focus_Click"/>
+
+                        <TextBlock Text="SCREEN" Foreground="#8A8A8A" FontSize="11"
+                                   FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,6,0"/>
                         <TextBox x:Name="ScreenWidthBox" Style="{StaticResource Input}" Width="48"
                                  AutomationProperties.Name="Screen width"
                                  TextAlignment="Center" Padding="4,2"
@@ -367,7 +422,7 @@
                                  ToolTip="Preview the panel at this size in pixels, shrunk to fit this window. Blank both fields to fill the pane instead."
                                  TextChanged="ScreenSize_Changed"/>
                     </StackPanel>
-                    <TextBlock Text="PREVIEW — click a group to edit it. Gated groups are all shown; the panel shows them per focused app."
+                    <TextBlock Text="PREVIEW — click a group to edit it."
                                Foreground="#8A8A8A" FontSize="11" FontWeight="SemiBold"
                                TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                 </DockPanel>

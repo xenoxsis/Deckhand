@@ -19,12 +19,22 @@ internal static class DesignerPreview
 {
     /// <summary>
     /// The whole panel body as the panel would draw it, with <paramref name="selected"/>
-    /// outlined and every group clickable. Sections gated on a profile are drawn too —
-    /// the designer's view is "every profile at once", since which app will be focused
-    /// isn't knowable here — and empty groups, which the panel drops, are kept as
-    /// something to click on while their buttons are still being written.
+    /// outlined and every group clickable. Empty groups, which the panel drops, are kept
+    /// as something to click on while their buttons are still being written.
+    ///
+    /// <paramref name="shows"/> decides which groups are in it — the designer asks either
+    /// for all of them, which is the view for building, or for the ones the panel would
+    /// draw with a given app in front. A group it refuses is dropped before the placer, as
+    /// the panel drops it: its cells go back to the pool and what came after it moves up,
+    /// which is the whole reason for looking at one profile at a time.
+    ///
+    /// <paramref name="folder"/> is what a tile's relative icon path is measured from —
+    /// the folder of the file being saved, so a picture is resolved here the way the panel
+    /// will resolve it when it reads that file.
     /// </summary>
-    public static UIElement Build(DashboardConfig config, SectionEntry? selected,
+    public static UIElement Build(DashboardConfig config, string folder,
+                                  SectionEntry? selected,
+                                  Func<SectionEntry, bool> shows,
                                   Action<SectionEntry> select)
     {
         int totalColumns = Math.Clamp(config.Layout.Columns, 1, 48);
@@ -40,7 +50,10 @@ internal static class DesignerPreview
 
         foreach (var section in config.EffectiveSections())
         {
-            var content = BuildSection(section, section == selected, select);
+            if (!shows(section)) continue;
+
+            var content = BuildSection(section, folder,
+                                       section == selected, select);
             var cell = placer.Place(section.Columns, section.Rows);
 
             while (grid.RowDefinitions.Count < cell.Row + cell.RowSpan)
@@ -63,7 +76,8 @@ internal static class DesignerPreview
         return grid;
     }
 
-    private static FrameworkElement BuildSection(SectionEntry section, bool isSelected,
+    private static FrameworkElement BuildSection(SectionEntry section, string folder,
+                                                 bool isSelected,
                                                  Action<SectionEntry> select)
     {
         var tiles = new List<(FrameworkElement Tile, int Span)>();
@@ -73,8 +87,8 @@ internal static class DesignerPreview
             : Math.Clamp(section.TilesPerRow ?? section.Columns.Value.Length, 1, 24);
 
         if (section.Source is { } source) tiles.AddRange(FolderGhosts(source));
-        tiles.AddRange(section.Apps.Select(a => ((FrameworkElement)AppTile(a), a.Span)));
-        tiles.AddRange(section.Snippets.Select(s => ((FrameworkElement)SnippetTile(s), s.Span)));
+        tiles.AddRange(section.Apps.Select(a => ((FrameworkElement)AppTile(a, folder), a.Span)));
+        tiles.AddRange(section.Snippets.Select(s => ((FrameworkElement)SnippetTile(s, folder), s.Span)));
 
         FrameworkElement body;
         if (tiles.Count == 0)
@@ -266,10 +280,15 @@ internal static class DesignerPreview
         return tile;
     }
 
-    private static FrameworkElement AppTile(AppEntry app)
+    private static FrameworkElement AppTile(AppEntry app, string folder)
     {
-        var main = MakeTile(app.Label, "SplitTileLeft");
+        var main = MakeTile(app.Label, "SplitTileLeft", Image(folder, app.Icon), app.IconMode);
+
+        // Never the picture, exactly as on the panel: it's the half that opens another
+        // window, and a preview that showed it as a logo would be showing a panel that
+        // can't happen.
         var add = MakeTile("+", "SplitTileRight");
+
         Accent(main, app.Color);
         Accent(add, app.Color);
 
@@ -288,12 +307,26 @@ internal static class DesignerPreview
         return pair;
     }
 
-    private static Button SnippetTile(SnippetEntry snippet)
+    private static Button SnippetTile(SnippetEntry snippet, string folder)
     {
-        var tile = MakeTile(snippet.Label);
+        var tile = MakeTile(snippet.Label, "TileButton",
+                            Image(folder, snippet.Icon), snippet.IconMode);
         Accent(tile, snippet.Color);
         return tile;
     }
+
+    /// <summary>
+    /// The tile's picture, read from the folder of the file this window has open — which
+    /// is the point of resolving it here rather than reusing whatever the panel loaded: a
+    /// relative icon path in a config being designed means a file beside *that* config,
+    /// and the designer may well have a different one open than the panel is running.
+    ///
+    /// Null for a file that's missing or won't decode, and the tile falls back to its
+    /// label — the same thing the panel does with it, so a picture that isn't going to
+    /// work looks the same here as it will there.
+    /// </summary>
+    private static ImageSource? Image(string folder, string? icon) =>
+        TileImages.Of(folder, icon)?.Image;
 
     private static void Accent(Button tile, string? color)
     {
@@ -312,17 +345,12 @@ internal static class DesignerPreview
         }
     }
 
-    private static Button MakeTile(string label, string style = "TileButton")
+    private static Button MakeTile(string label, string style = "TileButton",
+                                   ImageSource? image = null, IconMode mode = IconMode.Left)
     {
         return new Button
         {
-            Content = new TextBlock
-            {
-                Text = label,
-                TextWrapping = TextWrapping.Wrap,
-                TextAlignment = TextAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            },
+            Content = TileFaces.Draw(label, image, mode),
             Style = (Style)Application.Current.Resources[style],
             // Presses go through to the group behind, which is what a click in the
             // designer means.

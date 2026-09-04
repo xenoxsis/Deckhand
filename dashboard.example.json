@@ -61,6 +61,20 @@
       "columns": "1-2",
       "rows": "1-12",
       "tilesPerRow": 1,
+      // A picture on a button: "icon" is a path — absolute, or relative to this file's
+      // own folder — and "iconMode" says where it goes on the button. There are none
+      // below because the files would have to be yours; with a "pictures" folder beside
+      // this one it reads like this:
+      //
+      //   { "label": "Chrome", "path": "chrome", "icon": "pictures/chrome.png" }
+      //   { "label": "Chrome", "path": "chrome", "icon": "pictures/chrome.png",
+      //     "iconMode": "fill" }
+      //
+      // png, jpg, gif, bmp, ico, webp or svg — the types the panel and the tablet can both
+      // draw, and the tablet is sent the same file. "left" (the default) puts a small one
+      // before the label, "above" gives the picture the button with the label under it,
+      // and "fill" makes the button the picture, keeping the label as its tooltip. An
+      // app button's + is never a picture whichever it is.
       "apps": [
         {
           "label": "Chrome",

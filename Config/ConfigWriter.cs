@@ -159,6 +159,7 @@ internal static class ConfigWriter
         if (app.Windows.Count > 0) block["windows"] = Strings(app.Windows);
         if (app.Span != 1) block["span"] = app.Span;
         if (!string.IsNullOrWhiteSpace(app.Color)) block["color"] = app.Color;
+        Picture(block, app.Icon, app.IconMode);
         return block;
     }
 
@@ -173,7 +174,21 @@ internal static class ConfigWriter
         if (!string.IsNullOrWhiteSpace(snippet.Keys)) block["keys"] = snippet.Keys;
         if (snippet.Span != 1) block["span"] = snippet.Span;
         if (!string.IsNullOrWhiteSpace(snippet.Color)) block["color"] = snippet.Color;
+        Picture(block, snippet.Icon, snippet.IconMode);
         return block;
+    }
+
+    /// <summary>
+    /// A tile's picture, on the two kinds of tile that can wear one. The placement is
+    /// only written when there is a picture to place: "iconMode" on a tile with no
+    /// "icon" is a line that does nothing, and this file is read by people.
+    /// </summary>
+    private static void Picture(JsonObject block, string? icon, IconMode mode)
+    {
+        if (string.IsNullOrWhiteSpace(icon)) return;
+
+        block["icon"] = icon;
+        if (mode != IconMode.Left) block["iconMode"] = mode.ToString().ToLowerInvariant();
     }
 
     /// <summary>The two spellings the loader reads back: a width as the number it is,

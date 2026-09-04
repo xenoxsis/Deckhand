@@ -449,6 +449,66 @@ window the program already has — asking which, when there's more than one — 
     <p>Longer WPF forms like <code>#AARRGGBB</code> are deliberately refused: a browser reads
     eight digits as RGBA, so the two screens would disagree about what was written.</p>
   </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">icon</span>
+      <span class="key-type">string &mdash; a path</span>
+    </div>
+    <p>A picture for the tile. Absolute, or relative to <code>dashboard.json</code>'s own
+    folder, with <code>%ENVVARS%</code> expanded.</p>
+    <p>The designer's <code>…</code> copies the file it's given into a
+    <code>pictures</code> folder beside the config and writes the relative path, so a
+    layout and its pictures stay one thing you can move. A picture already under that
+    folder is left where it is, an identical one already copied is pointed at rather than
+    copied twice, and a path typed by hand is left exactly as typed.</p>
+    <p><code>png</code>, <code>jpg</code>, <code>gif</code>, <code>bmp</code>,
+    <code>ico</code>, <code>webp</code> and <code>svg</code> &mdash; the intersection of
+    what the panel can draw and what a browser can. The tablet is sent the same file, and a
+    picture only one of the two screens can show is a tile that looks different there.
+    <code>tiff</code> is the one left out, and nothing over 2MB.</p>
+    <p><code>svg</code> stays a drawing rather than becoming pixels, so it is sharp at
+    whatever size the tile turns out to be. It has to be self-contained: one that points at
+    another file, declares entities, or carries <code>&lt;script&gt;</code>, a
+    <code>&lt;foreignObject&gt;</code> or an <code>on&hellip;</code> handler is refused at
+    load with a line naming which. Pointing within itself (<code>#gradient</code>) is fine;
+    a picture carried inline (<code>data:&hellip;</code>) is not, because the drawing package
+    draws nothing for one while a browser draws it &mdash; point the tile at that picture
+    instead. Text set in a font is the last thing that can differ between the two screens,
+    so prefer an svg whose lettering was converted to outlines.</p>
+    Web Media Extensions component, which a stock Windows 10 or 11 has and some Server and
+    LTSC builds don't. Without it the load warning says so and the tile draws its label, on
+    the tablet too: the panel is what offers a picture at all, so one it can't decode is
+    never sent.</p>
+    <p>Windows' webp decoder also reports its frames as carrying no transparency when they
+    plainly do &mdash; the alpha is in the bytes, only not in the label &mdash; so a logo
+    exported with a transparent background would otherwise draw in a solid black box. The
+    panel relabels those frames instead of believing them, so a transparent webp behaves
+    like a transparent png. An opaque one is unaffected.</p>
+    <p>Nothing is extracted, guessed or fetched: the tile draws the file named here and no
+    other. One that's missing, too big, of the wrong type or simply not decodable is named at
+    load with the other config warnings, and the tile draws its label instead.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">iconMode</span>
+      <span class="key-type">"left" | "above" | "fill"</span>
+      <span class="badge def">left</span>
+    </div>
+    <p>Where that picture goes on the tile:</p>
+    <ul>
+      <li><strong>left</strong> &mdash; a small one at text height, before the label.</li>
+      <li><strong>above</strong> &mdash; the picture takes the tile, and the label sits
+        underneath it.</li>
+      <li><strong>fill</strong> &mdash; the tile <em>is</em> the picture, with the label kept
+        as its tooltip.</li>
+    </ul>
+    <p>The label never goes away, whichever of the three this is: it stays what the tile is
+    called in the log, in a tap from the tablet and to a screen reader. The <code>+</code> is
+    never a picture either &mdash; it's the half that opens another window, and on a pair
+    whose wide side has become a logo it's the only thing left with a shape to look for.</p>
+  </div>
 </div>
 
 <figure class="code">
@@ -459,6 +519,10 @@ window the program already has — asking which, when there's more than one — 
   "tilesPerRow": 1,
   "apps": [
     { "label": "Editor", "path": "code", "color": "#4a8fe0" },
+
+    // A picture beside the label. "iconMode": "fill" would make the tile
+    // the picture instead, keeping "Chrome" as its tooltip.
+    { "label": "Chrome", "path": "chrome", "icon": "pictures/chrome.png" },
 
     // A folder: opens in Explorer, and the wide side prefers an Explorer
     // window whose title already names this folder.
@@ -571,6 +635,24 @@ never takes focus, "whatever window is focused" is the one you were just typing 
       <span class="key-type">"#RGB" or "#RRGGBB"</span>
     </div>
     <p>As on an app tile.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">icon</span>
+      <span class="key-type">string &mdash; a path</span>
+    </div>
+    <p>As on an app tile.</p>
+  </div>
+
+  <div class="key">
+    <div class="key-head">
+      <span class="key-name">iconMode</span>
+      <span class="key-type">"left" | "above" | "fill"</span>
+      <span class="badge def">left</span>
+    </div>
+    <p>As on an app tile. There's no <code>+</code> on this kind, so <code>fill</code> leaves
+    the tile as nothing but the picture.</p>
   </div>
 </div>
 
@@ -1002,6 +1084,9 @@ anyone's real panel — the paths and commands are invented.</p>
       "tilesPerRow": 1,
       "apps": [
         { "label": "Editor",  "path": "code", "color": "#4a8fe0" },
+        { "label": "Chrome",  "path": "chrome", "icon": "pictures/chrome.png" },
+        { "label": "Jira",    "path": "https://example.atlassian.net",
+          "icon": "pictures/jira.png", "iconMode": "fill" },
         { "label": "Mail",    "path": "outlook" },
         { "label": "Reports", "path": "D:/Work/Reports" },
         { "label": "Shell",   "path": "C:/Program Files/Git/git-bash.exe",

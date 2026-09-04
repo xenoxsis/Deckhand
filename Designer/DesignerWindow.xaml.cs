@@ -3,10 +3,12 @@ using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Deckhand;
 
@@ -62,7 +64,14 @@ public partial class DesignerWindow : Window
     private static readonly Brush AccentBrush = new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC));
     private static readonly Brush TileBrush = new SolidColorBrush(Color.FromRgb(0x2D, 0x2D, 0x30));
 
-    public DesignerWindow()
+    /// <summary>
+    /// Opens on the file the panel would read. <paramref name="screen"/> is a size to
+    /// preview at from whoever opened this — the tablet's, from the remote window — which
+    /// beats the size this window was last left at: a measurement of the screen the
+    /// layout is actually for is better than a memory of what was being looked at last
+    /// time. Nothing passed, and the remembered size stands.
+    /// </summary>
+    internal DesignerWindow(DesignerScreen? screen = null)
     {
         InitializeComponent();
 
@@ -75,7 +84,16 @@ public partial class DesignerWindow : Window
             Height = Math.Max(MinHeight, saved.Height);
         }
 
-        (_screenWidth, _screenHeight) = LoadPreviewSize();
+        if (screen is { } given)
+        {
+            (_screenWidth, _screenHeight) = (given.Width, given.Height);
+            Explain(given.Because);
+        }
+        else
+        {
+            (_screenWidth, _screenHeight) = LoadPreviewSize();
+        }
+
         _updating = true;
         ScreenWidthBox.Text = _screenWidth?.ToString() ?? "";
         ScreenHeightBox.Text = _screenHeight?.ToString() ?? "";
@@ -84,6 +102,18 @@ public partial class DesignerWindow : Window
 
         _path = DashboardConfig.ResolvePath();
         LoadFrom(_path);
+    }
+
+    /// <summary>
+    /// Says why the SCREEN boxes already have numbers in them, on the boxes themselves —
+    /// a field that filled itself in owes an answer to "who typed that?", and the field is
+    /// where the question gets asked. Appended to what they already say rather than
+    /// replacing it: how to clear them is still worth knowing.
+    /// </summary>
+    private void Explain(string because)
+    {
+        ScreenWidthBox.ToolTip = $"{ScreenWidthBox.ToolTip}\n\n{because}";
+        ScreenHeightBox.ToolTip = $"{ScreenHeightBox.ToolTip}\n\n{because}";
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -608,6 +638,8 @@ public partial class DesignerWindow : Window
                 TileArgsBox.Text = app.Args ?? "";
                 TileSpanBox.Text = app.Span.ToString();
                 TileColorBox.Text = app.Color ?? "";
+                TileIconBox.Text = app.Icon ?? "";
+                UpdateIconButtons(app.IconMode);
                 break;
 
             case SnippetEntry snippet:
@@ -621,9 +653,12 @@ public partial class DesignerWindow : Window
                 TileKeysBox.Text = snippet.Keys ?? "";
                 TileSpanBox.Text = snippet.Span.ToString();
                 TileColorBox.Text = snippet.Color ?? "";
+                TileIconBox.Text = snippet.Icon ?? "";
+                UpdateIconButtons(snippet.IconMode);
                 UpdateMethodButtons(snippet.Method);
                 break;
         }
+        ShowIcon(Blank(TileIconBox.Text));
         Mark(TileSpanBox, ok: true);
         Mark(TileColorBox, ok: true);
         _updating = false;
@@ -757,6 +792,259 @@ public partial class DesignerWindow : Window
 
     private void SwatchNone_Click(object sender, RoutedEventArgs e) => TileColorBox.Text = "";
 
+    // ---- The selected button's picture --------------------------------------
+
+    /// <summary>What the PICTURE box says while it's empty, and what it goes back to
+    /// when it's cleared.</summary>
+    private const string IconHint =
+        "png, jpg, gif, bmp, ico, webp or svg — what the panel and the tablet can both "
+        + "draw. Pick one with … from anywhere and it's copied in beside the config, so "
+        + "the layout and its pictures stay one thing you can move.";
+
+    private void TileIcon_Changed(object sender, TextChangedEventArgs e)
+    {
+        if (_updating || _tile is null) return;
+
+        string? icon = Blank(TileIconBox.Text);
+        switch (_tile)
+        {
+            case AppEntry app: app.Icon = icon; break;
+            case SnippetEntry snippet: snippet.Icon = icon; break;
+        }
+
+        ShowIcon(icon);
+        Touch();
+    }
+
+    /// <summary>
+    /// What that path found, under the box that holds it: the file and its size, or the
+    /// reason there isn't one. This is the field that can't be checked by reading it — a
+    /// relative path is relative to the file being saved, which needn't be anywhere near
+    /// what this window is showing — so it's worth answering out loud instead of leaving
+    /// the preview to draw a label where a picture was meant to be.
+    /// </summary>
+    private void ShowIcon(string? icon)
+    {
+        // Taken and cleared in one go: what the pick did is said by this call and not by
+        // the next one, which will have been provoked by a keystroke instead.
+        (string? copied, bool trouble) = (_copySaid, _copyTrouble);
+        (_copySaid, _copyTrouble) = (null, false);
+
+        // The three placements only mean something once there's something to place.
+        IconModes.Visibility = icon is null ? Visibility.Collapsed : Visibility.Visible;
+
+        if (icon is null)
+        {
+            Mark(TileIconBox, ok: true);
+            IconNote.Foreground = DimBrush;
+            IconNote.Text = IconHint;
+            return;
+        }
+
+        var picture = TileImages.Of(Folder(), icon);
+        bool ok = picture is { Problem: null };
+
+        Mark(TileIconBox, ok);
+        IconNote.Foreground = ok && !trouble ? DimBrush : BadBrush;
+        IconNote.Text = ok ? Found(picture!) : picture!.Problem;
+        if (copied is not null) IconNote.Text += $"\n{copied}";
+    }
+
+    /// <summary>The file the path landed on, said the way the panel would see it — and
+    /// its size, because that is what the tablet will be sent.</summary>
+    private static string Found(TileImages.Picture picture)
+    {
+        // A vector says its size too, and says that it is one: an svg is the one picture
+        // here whose size isn't a limit, so knowing which kind arrived is worth a word.
+        string size = picture.Image switch
+        {
+            BitmapSource bitmap => $"{bitmap.PixelWidth}×{bitmap.PixelHeight}, ",
+            DrawingImage { Drawing.Bounds: var box } when box is { Width: > 0, Height: > 0 }
+                => $"{box.Width:0.#}×{box.Height:0.#} vector, ",
+            _ => "",
+        };
+
+        return $"{picture.Path} — {size}{Math.Max(1, picture.Bytes.Length / 1024)}KB, and "
+               + "the tablet is sent that same file.";
+    }
+
+    /// <summary>Where a picked picture is copied to, under the config's own folder.</summary>
+    private const string PicturesFolder = "pictures";
+
+    /// <summary>
+    /// What to say about the picture that was just picked — that it was copied in, that
+    /// one just like it was already there, or that copying it didn't work. Said once, by
+    /// the <see cref="ShowIcon"/> that follows the pick, and not again on the next
+    /// keystroke: it's news about that act, not a fact about the field.
+    /// </summary>
+    private string? _copySaid;
+    private bool _copyTrouble;
+
+    private void BrowseIcon_Click(object sender, RoutedEventArgs e)
+    {
+        if (_tile is null) return;
+
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "Pictures (*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.ico;*.webp;*.svg)"
+                     + "|*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.ico;*.webp;*.svg|All files (*.*)|*.*",
+            Title = "Which picture should this button wear?",
+            InitialDirectory = Folder(),
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var picked = Adopt(dialog.FileName);
+        (_copySaid, _copyTrouble) = (picked.Said, picked.Trouble);
+
+        // Through the box rather than the model, so the one TextChanged path applies it,
+        // marks the window dirty and redraws the preview.
+        TileIconBox.Text = picked.Path;
+    }
+
+    /// <summary>
+    /// The path worth writing down for a picture that was just picked — and, when that
+    /// picture lives somewhere else entirely, a copy of it beside the config first.
+    ///
+    /// The point is that a config and its pictures should be one thing you can move. A
+    /// path into a downloads folder is a tile that breaks the day that folder is tidied,
+    /// and it breaks quietly: the tile falls back to its label, and only the load warnings
+    /// say why. A copy costs a few KB and turns "don't move that file" into "don't delete
+    /// the folder your config is in", which is the care that config already needs.
+    ///
+    /// A picture already under the config's folder is left exactly where it is — including
+    /// in a folder someone arranged themselves — and a file that can't be used isn't
+    /// copied at all, so the pictures folder never collects anything that doesn't draw.
+    /// </summary>
+    private (string Path, string? Said, bool Trouble) Adopt(string file)
+    {
+        string folder = Folder();
+        if (folder.Length == 0) return (file, null, false);
+
+        // Already ours: a relative path, and nothing to copy.
+        if (Nearby(file) is { } near) return (near, null, false);
+
+        // One that can't be used is written as the path it is, and the line under the box
+        // says what's wrong with it. Copying it in would only litter the folder.
+        if (TileImages.Of("", file) is not { Problem: null } source)
+        {
+            return (file, null, false);
+        }
+
+        try
+        {
+            string pictures = Path.Combine(folder, PicturesFolder);
+            Directory.CreateDirectory(pictures);
+
+            var (target, existing) = FreeName(pictures, Path.GetFileName(file), source.Hash);
+            if (!existing) File.Copy(file, target);
+
+            string name = $"{PicturesFolder}/{Path.GetFileName(target)}";
+            return (name, existing
+                ? $"{name} was already there with the same content, so this points at it "
+                  + "rather than adding a second copy."
+                : $"Copied here from {file}, so the config and its pictures move together.",
+                false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                                      or ArgumentException or NotSupportedException)
+        {
+            // Not worth a dialog — the path still works, it just isn't a copy. But it is
+            // worth saying, because the reason to pick a picture through this button is
+            // that it ends up somewhere safe, and this time it didn't.
+            return (file, $"It couldn't be copied beside the config — {ex.Message} So this "
+                          + "points at where the file is now, and the tile breaks if it "
+                          + "moves.", true);
+        }
+    }
+
+    /// <summary>
+    /// The name to give this file in the pictures folder: its own, unless that's taken by
+    /// something else. A file already there with the same content is pointed at rather
+    /// than copied over — two tiles wearing one picture is the ordinary case, and the hash
+    /// makes it free to notice — and anything else gets a number.
+    /// </summary>
+    private static (string Path, bool Existing) FreeName(string pictures, string name,
+                                                         string hash)
+    {
+        string stem = Path.GetFileNameWithoutExtension(name);
+        string extension = Path.GetExtension(name);
+
+        for (int n = 1; n < 100; n++)
+        {
+            string candidate = Path.Combine(pictures, n == 1 ? name : $"{stem}-{n}{extension}");
+
+            if (!File.Exists(candidate)) return (candidate, false);
+            if (TileImages.Of("", candidate)?.Hash == hash) return (candidate, true);
+        }
+
+        // A hundred different pictures all called chrome.png doesn't deserve a cleverer
+        // answer than a name nothing else will have.
+        return (Path.Combine(pictures, $"{stem}-{Guid.NewGuid():N}{extension}"), false);
+    }
+
+    /// <summary>
+    /// The path as it's worth writing down when the picture is already under the config's
+    /// own folder: relative, so the two move as one folder and the line reads the way it
+    /// would have been typed. Null for a file outside that folder — <see cref="Adopt"/>
+    /// deals with those — because "..\..\pictures" is shorter, not more portable.
+    /// </summary>
+    private string? Nearby(string file)
+    {
+        try
+        {
+            string folder = Folder();
+            if (folder.Length == 0) return null;
+
+            string relative = Path.GetRelativePath(folder, file);
+            if (relative.StartsWith("..", StringComparison.Ordinal)
+                || Path.IsPathRooted(relative))
+            {
+                return null;
+            }
+
+            // Forward slashes, as the rest of this file's paths are written: JSON would
+            // otherwise have to escape every separator.
+            return relative.Replace('\\', '/');
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The folder a relative icon path is measured from: the one holding the file Save
+    /// writes, not the one this config happened to be read from. Those differ after a
+    /// Save As, and it's the file being written that a path in it will be relative to.
+    /// </summary>
+    private string Folder() => Path.GetDirectoryName(_path) ?? "";
+
+    private void IconLeft_Click(object sender, RoutedEventArgs e) => SetIconMode(IconMode.Left);
+
+    private void IconAbove_Click(object sender, RoutedEventArgs e) => SetIconMode(IconMode.Above);
+
+    private void IconFill_Click(object sender, RoutedEventArgs e) => SetIconMode(IconMode.Fill);
+
+    private void SetIconMode(IconMode mode)
+    {
+        switch (_tile)
+        {
+            case AppEntry app: app.IconMode = mode; break;
+            case SnippetEntry snippet: snippet.IconMode = mode; break;
+            default: return;
+        }
+
+        UpdateIconButtons(mode);
+        Touch();
+    }
+
+    private void UpdateIconButtons(IconMode mode)
+    {
+        IconLeftButton.Background = mode == IconMode.Left ? AccentBrush : TileBrush;
+        IconAboveButton.Background = mode == IconMode.Above ? AccentBrush : TileBrush;
+        IconFillButton.Background = mode == IconMode.Fill ? AccentBrush : TileBrush;
+    }
+
     // ---- Shared field plumbing ----------------------------------------------
 
     /// <summary>A field the model reader couldn't take is outlined red and left
@@ -867,6 +1155,16 @@ public partial class DesignerWindow : Window
         Mark(GridRowsBox, ok: true);
         _updating = false;
 
+        // A profile the file that was open before had needn't exist in this one, and a
+        // preview pretending about an app the config has never heard of would be showing
+        // a panel that can't happen.
+        if (_focus is not null && !ReferenceEquals(_focus, Everything)
+            && !_config.Profiles.Contains(_focus))
+        {
+            _focus = Everything;
+        }
+
+        FocusButton.Content = FocusCaption();
         PreviewSizeText.Text = GridCaption();
         RefreshSectionList();
         RefreshSectionEditor();
@@ -875,10 +1173,100 @@ public partial class DesignerWindow : Window
     }
 
     private void RefreshPreview() =>
-        PreviewHost.Content = DesignerPreview.Build(_config, _section, section =>
+        PreviewHost.Content = DesignerPreview.Build(_config, Folder(), _section, Shows, section =>
         {
             // Only groups the designer holds are selectable — belt and braces; after
             // the shorthand fold there are no synthetic ones left to click.
             if (_config.Sections.Contains(section)) Select(section);
         });
+
+    // ---- Which app the preview is pretending is focused ---------------------
+
+    /// <summary>
+    /// Stands for "draw every group, gated or not". A ProfileEntry rather than a flag of
+    /// its own, so the three answers — everything, one app, nothing focused — are one
+    /// field with one meaning each: this instance, a real profile, or null. It is only
+    /// ever compared by reference; its label is what the button says.
+    /// </summary>
+    private static readonly ProfileEntry Everything = new() { Label = "Every group" };
+
+    /// <summary>
+    /// What the preview is pretending about the focused window. Everything is the default
+    /// because that's the view a layout gets built in — a group that isn't drawn can't be
+    /// clicked to edit — and the other answers are for looking at the result.
+    /// </summary>
+    private ProfileEntry? _focus = Everything;
+
+    /// <summary>
+    /// Which groups the preview draws: the panel's own rule, whose null case is "nothing
+    /// matched, so only the ungated ones" — except under <see cref="Everything"/>, where
+    /// nothing is dropped at all.
+    /// </summary>
+    private bool Shows(SectionEntry section) =>
+        ReferenceEquals(_focus, Everything) || section.AppliesTo(_focus);
+
+    /// <summary>
+    /// The profiles to choose between, which are the config's — the panel matches a real
+    /// window against these, and this window is picking one of the same answers by hand
+    /// because nothing here is focused except the designer.
+    /// </summary>
+    private void Focus_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu
+        {
+            Style = (Style)FindResource("DarkMenu"),
+            PlacementTarget = FocusButton,
+            Placement = PlacementMode.Bottom,
+        };
+
+        menu.Items.Add(FocusItem(Everything));
+        menu.Items.Add(FocusItem(null));
+
+        if (_config.Profiles.Count > 0)
+        {
+            menu.Items.Add(new Separator { Style = (Style)FindResource("DarkMenuLine") });
+            foreach (var profile in _config.Profiles) menu.Items.Add(FocusItem(profile));
+        }
+
+        // Built on each click rather than kept: the profiles come from the file, and
+        // opening another one — or editing this one — changes the list.
+        menu.IsOpen = true;
+    }
+
+    private MenuItem FocusItem(ProfileEntry? profile)
+    {
+        var item = new MenuItem
+        {
+            Header = Focused(profile),
+            Style = (Style)FindResource("DarkMenuItem"),
+        };
+        item.Click += (_, _) => ShowFocus(profile);
+        return item;
+    }
+
+    private void ShowFocus(ProfileEntry? profile)
+    {
+        _focus = profile;
+        FocusButton.Content = FocusCaption();
+        RefreshPreview();
+    }
+
+    /// <summary>What a choice is called: a profile by its label, null by what null means
+    /// to the panel, and the sentinel by its own.</summary>
+    private static string Focused(ProfileEntry? profile) =>
+        profile is null ? "Nothing focused"
+        : profile.Label.Length > 0 ? profile.Label
+        : "(unnamed profile)";
+
+    private string FocusCaption() => $"{Focused(_focus)}  ▾";
 }
+
+/// <summary>
+/// A screen for the designer to open its preview at, with a sentence saying where the
+/// number came from. Passed in rather than measured here, because the only thing that
+/// knows a real screen is the one talking to it: the remote window, whose tablet reports
+/// the box its tiles are drawn in.
+/// </summary>
+/// <param name="Because">Shown on the SCREEN boxes, so a field that filled itself in can
+/// answer for itself. A whole sentence — the designer only displays it.</param>
+internal sealed record DesignerScreen(int Width, int Height, string Because);

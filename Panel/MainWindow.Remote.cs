@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 
@@ -85,7 +86,7 @@ public partial class MainWindow
     /// </summary>
     internal RemoteStatus Status()
     {
-        var activity = _remote?.Activity ?? (null, null, 0, null);
+        var activity = _remote?.Activity ?? (null, null, 0, null, null);
 
         return new RemoteStatus(
             Serving: _remote is not null,
@@ -97,6 +98,7 @@ public partial class MainWindow
             Tiles: _remoteTiles.Count,
             Ready: _unlocked is null && !DashboardHasFocus(),
             activity.LastSeenUtc, activity.Peer, activity.Taps, activity.Screen,
+            activity.Tablet,
             Pinned: _remote?.Pinned);
     }
 
@@ -212,7 +214,7 @@ public partial class MainWindow
         _remote.Publish(_contextText, ready: _unlocked is null,
                         columns: sectionGrid?.ColumnDefinitions.Count ?? 1,
                         rows: sectionGrid?.RowDefinitions.Count ?? 1,
-                        groups, overlay);
+                        groups, overlay, Pictures(groups, overlay));
     }
 
     /// <summary>
@@ -339,7 +341,10 @@ public partial class MainWindow
 
         foreach (var (button, row, column, span, trailing, indent, joined) in cells)
         {
-            string text = (button.Content as TextBlock)?.Text ?? "";
+            // Not read from the content, which is no longer always text: a tile can be a
+            // picture now, and its label still has to reach the tablet, the log and the id
+            // below. See LabelOf for the two places it can be.
+            string text = TileFaces.LabelOf(button);
 
             // Ids are content-addressed rather than positional, so adding a tile doesn't
             // renumber the others and a page left open on the tablet still names what it
@@ -350,17 +355,50 @@ public partial class MainWindow
 
             string id = TileId(scope, text, repeat);
             _remoteTiles[id] = button;
+
+            // The face the tile was built wearing: its accent, and the hash of its
+            // picture if it has one. The hash is all the tablet is told — it asks for the
+            // bytes by content, so nothing in a request it sends back names a file.
+            var face = button.Tag as TileFace;
+
             tiles.Add(new RemoteTile(id, text, row, column, span, trailing, indent, joined,
-                                     Color: button.Tag as string));
+                                     Color: face?.Color, Icon: face?.Icon,
+                                     IconMode: face?.Mode ?? IconMode.Left));
         }
 
         return (columns, tiles);
     }
 
+    /// <summary>
+    /// The pictures that snapshot's tiles will ask for, by the hash they name them by.
+    /// Published with the tiles rather than served from a folder: the server answers for
+    /// exactly the set of pictures currently on the panel, so a request can only ever
+    /// name one of those — there is no path in it to sanitise and nothing else to reach.
+    /// </summary>
+    private static IReadOnlyDictionary<string, TileImages.Picture> Pictures(
+        IReadOnlyList<RemoteGroup> groups, RemoteOverlay? overlay)
+    {
+        var pictures = new Dictionary<string, TileImages.Picture>(StringComparer.Ordinal);
+
+        var tiles = groups.SelectMany(g => g.Tiles)
+                          .Concat(overlay?.Tiles ?? (IReadOnlyList<RemoteTile>)Array.Empty<RemoteTile>());
+
+        foreach (var tile in tiles)
+        {
+            if (tile.Icon is not { } hash || pictures.ContainsKey(hash)) continue;
+
+            // Missing only if the panel was rebuilt between drawing that tile and this
+            // walk, which it isn't — the two are one turn of the UI thread.
+            if (TileImages.Find(hash) is { } picture) pictures[hash] = picture;
+        }
+
+        return pictures;
+    }
+
     /// <summary>A tile's label for the log, with the line break a folder tile carries
     /// flattened so one tap stays one line.</summary>
     private static string TileLabel(Button tile) =>
-        ((tile.Content as TextBlock)?.Text ?? "").Replace("\n", " — ");
+        TileFaces.LabelOf(tile).Replace("\n", " — ");
 
     private static string TileId(string group, string label, int repeat)
     {

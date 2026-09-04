@@ -98,18 +98,27 @@ public class DashboardConfig
             }
         }
 
-        // Tile colours, before they reach a brush: an unparseable one is silently
-        // unpainted at render time, which looks like the config being ignored.
+        // Tile faces, before they reach a brush or a decoder: a colour that won't parse
+        // goes unpainted at render time and a picture that isn't there goes undrawn, and
+        // both of those look like the config being ignored.
         foreach (var section in EffectiveSections())
         {
-            var tiles = section.Apps.Select(a => (a.Label, a.Color))
-                        .Concat(section.Snippets.Select(s => (s.Label, s.Color)));
-            foreach (var (label, color) in tiles)
+            var tiles = section.Apps.Select(a => (a.Label, a.Color, a.Icon))
+                        .Concat(section.Snippets.Select(s => (s.Label, s.Color, s.Icon)));
+            foreach (var (label, color, icon) in tiles)
             {
                 if (color is not null && !ValidColor(color))
                 {
                     Warnings.Add($"Tile \"{label}\" has the color \"{color}\", which "
                                  + "isn't #RGB or #RRGGBB — it won't be painted.");
+                }
+
+                // Reads and decodes the file, which also warms it for the render that
+                // follows: this runs once per load, and the tiles are about to want it.
+                if (TileImages.Problem(SourceFolder, icon) is { } problem)
+                {
+                    Warnings.Add($"Tile \"{label}\" asks for a picture and {problem}. "
+                                 + "It will draw its label instead.");
                 }
             }
         }
@@ -194,6 +203,15 @@ public class DashboardConfig
     /// <summary>Which file this was read from, so the ↻ button can name it.</summary>
     [JsonIgnore]
     public string SourcePath { get; private set; } = "";
+
+    /// <summary>
+    /// The folder that file sat in, which is what a tile's relative icon path is relative
+    /// to. Kept apart from SourcePath because that one is a sentence for the reload
+    /// tooltip — it reads "dashboard.json + dashboard.local.json" when both were used —
+    /// while this one has to stay a path.
+    /// </summary>
+    [JsonIgnore]
+    public string SourceFolder { get; private set; } = "";
 
     /// <summary>
     /// Reads dashboard.json, with dashboard.local.json merged over it when one sits
@@ -374,6 +392,7 @@ public class DashboardConfig
     private static DashboardConfig Ready(DashboardConfig config, string path)
     {
         config.SourcePath = path;
+        config.SourceFolder = Path.GetDirectoryName(path) ?? "";
         config.Remote.ResolveToken();
 
         // What the converter couldn't read, and what it left behind: a range that

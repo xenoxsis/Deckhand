@@ -19,9 +19,19 @@ namespace Deckhand;
 /// the wide side and starts another copy on the narrow one.</param>
 /// <param name="Color">The tile's accent, as the config wrote it (#RGB or #RRGGBB), or
 /// null for the stock outline. The page paints its border with it, as the panel does.</param>
+/// <param name="Icon">The content hash of the tile's picture, or null for a tile that is
+/// only a label. The page fetches the bytes from IconPath with this on the end, once per
+/// hash — a hash and never a path, so nothing about where the file sits on the laptop
+/// crosses, and a page asking for one can only ever name a picture the panel is currently
+/// wearing.</param>
+/// <param name="IconMode">Where that picture goes: "left" of the label, "above" it, or
+/// "fill" — the picture alone, with the label kept as the tooltip. The same three words
+/// the config spells, and the reason the label is always here whichever it is: it names
+/// the tile in a tap, in the log and to a screen reader even when it isn't drawn.</param>
 internal sealed record RemoteTile(string Id, string Label, int Row, int Column, int Span,
                                  bool Trailing, int Indent, bool Joined,
-                                 string? Color = null);
+                                 string? Color = null, string? Icon = null,
+                                 IconMode IconMode = IconMode.Left);
 
 /// <summary>
 /// The picker, while it's open: a modal over the panel, listing one choice per row.
@@ -72,6 +82,8 @@ internal sealed record RemoteSnapshot(int Revision, string Context, bool Ready,
 /// <param name="Error">Why nothing is being served, when that's the case.</param>
 /// <param name="Screen">What the tablet last said about keeping its own screen on:
 /// "lock", "video", "none", or null from a page too old to say.</param>
+/// <param name="Tablet">How much screen the page has to draw in, as it measured it —
+/// null from a page too old to say.</param>
 /// <param name="TokenSource">Which file the token in use was read from, for the tooltip
 /// on it — the one question a masked field otherwise can't answer.</param>
 /// <param name="Pinned">The device this session is paired with, or null before one has
@@ -81,4 +93,23 @@ internal sealed record RemoteStatus(bool Serving, string? Error,
                                     string TokenSource,
                                     string Context, int Tiles, bool Ready,
                                     DateTime? LastSeenUtc, string? Peer, int Taps,
-                                    string? Screen, string? Pinned);
+                                    string? Screen, TabletScreen? Tablet, string? Pinned);
+
+/// <summary>
+/// How much screen there is on the other side, measured by the page and sent on every
+/// request — because it's the one thing about the tablet this end can't work out for
+/// itself, and the panel is being laid out for it.
+///
+/// All of it in CSS pixels, which is the unit the page lays out in and the unit the
+/// designer's screen size wants; <paramref name="Ratio"/> is how many device pixels
+/// each one is worth, and is why a tablet sold as 2560×1600 reports 1280×800 and is
+/// right to.
+/// </summary>
+/// <param name="Width">The visible viewport — what's left of the window after the
+/// browser's own bars, measured rather than assumed.</param>
+/// <param name="TilesWidth">The box the tiles themselves are laid out in: the viewport
+/// less the page's own header and whatever banner is up. This is the size to put in the
+/// designer, whose preview is the tile grid and nothing around it. Null while the page
+/// is still at the token box, having nothing laid out to measure.</param>
+internal sealed record TabletScreen(int Width, int Height, double Ratio,
+                                    int? TilesWidth, int? TilesHeight);

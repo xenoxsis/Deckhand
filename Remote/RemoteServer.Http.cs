@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -198,6 +199,15 @@ internal sealed partial class RemoteServer
             return;
         }
 
+        // A tile's picture, named by the hash of its own bytes. Behind the token and the
+        // pairing like everything else here: the pictures are this machine's files, and
+        // which ones a panel wears is as much about it as the tiles are.
+        if (request.HttpMethod == "GET" && path.StartsWith(IconPath, StringComparison.Ordinal))
+        {
+            SendIcon(context, path[IconPath.Length..]);
+            return;
+        }
+
         if (request.HttpMethod == "POST" && path == "/api/tap")
         {
             Tap(context);
@@ -227,6 +237,7 @@ internal sealed partial class RemoteServer
         else if (quiet) _log.Add(LogKind.Panel, $"tablet back — {peer}");
 
         NoteScreen(request.Headers[ScreenHeader], different);
+        NoteViewport(request.Headers[ViewportHeader], different);
     }
 
     /// <summary>
@@ -249,6 +260,95 @@ internal sealed partial class RemoteServer
             _ => "the tablet can't keep its screen awake — it may sleep mid-task",
         });
     }
+
+    /// <summary>
+    /// How much screen the page says it has, and a line in the log when that changes —
+    /// which is the point of asking at all: the panel is being laid out for a screen
+    /// nothing on this end can measure, and the answer is a number to put into the
+    /// designer. Rotating the tablet or dropping the browser's bars changes it, so it's
+    /// a line per change rather than a line per request.
+    ///
+    /// Junk is dropped rather than reported. Anything that gets past the token can send
+    /// this header, and the log is the only account of what happened here — so nothing
+    /// but numbers a screen could plausibly have ever reaches it, and never the text as
+    /// it arrived.
+    /// </summary>
+    private void NoteViewport(string? header, bool newTablet)
+    {
+        if (ReadViewport(header) is not { } tablet) return;
+
+        var before = _tablet;
+        _tablet = tablet;
+
+        // Records compare by value, so this is "the same measurement", not "the same
+        // object" — the page sends a fresh one of these every second.
+        if (tablet == before && !newTablet) return;
+
+        string ratio = tablet.Ratio > 1 ? $" at {tablet.Ratio:0.##}× pixels" : "";
+        string tiles = tablet.TilesWidth is { } width && tablet.TilesHeight is { } height
+            ? $", tiles {width}×{height} — that pair is what the designer's screen size wants"
+            : "";
+
+        _log.Add(LogKind.Panel, $"the tablet's screen is {tablet.Width}×{tablet.Height}"
+                                + $"{ratio}{tiles}");
+    }
+
+    /// <summary>
+    /// The one shape accepted: "1280x800@2", optionally followed by " tiles=1264x744".
+    /// Null for anything else — a header is exactly as trustworthy as whoever sent it,
+    /// and this one ends up on screen.
+    /// </summary>
+    private static TabletScreen? ReadViewport(string? header)
+    {
+        if (header is null || header.Length is 0 or > 64) return null;
+
+        var parts = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length is 0 or > 2) return null;
+
+        var box = parts[0].Split('@');
+        if (box.Length > 2 || ReadBox(box[0]) is not { } viewport) return null;
+
+        double ratio = 1;
+        if (box.Length == 2
+            && (!double.TryParse(box[1], NumberStyles.AllowDecimalPoint,
+                                 CultureInfo.InvariantCulture, out ratio)
+                || ratio is < 0.25 or > 16))
+        {
+            return null;
+        }
+
+        (int W, int H)? tiles = null;
+        if (parts.Length == 2)
+        {
+            const string prefix = "tiles=";
+            if (!parts[1].StartsWith(prefix, StringComparison.Ordinal)) return null;
+            if (ReadBox(parts[1][prefix.Length..]) is not { } measured) return null;
+            tiles = measured;
+        }
+
+        return new TabletScreen(viewport.W, viewport.H, ratio, tiles?.W, tiles?.H);
+    }
+
+    /// <summary>
+    /// "1280x800", and only when both halves are a plain count of pixels a screen could
+    /// have. NumberStyles.None on purpose: no sign, no spaces, no thousands separator —
+    /// the page sends digits, so anything else is not the page.
+    /// </summary>
+    private static (int W, int H)? ReadBox(string text)
+    {
+        int cross = text.IndexOf('x');
+        if (cross < 1) return null;
+
+        return Pixels(text[..cross]) is { } width && Pixels(text[(cross + 1)..]) is { } height
+            ? (width, height)
+            : null;
+    }
+
+    private static int? Pixels(string text) =>
+        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out int value)
+        && value is >= 64 and <= 20000
+            ? value
+            : null;
 
     /// <summary>After this much silence, the next request is worth a line again.</summary>
     private static readonly TimeSpan QuietAgain = TimeSpan.FromSeconds(30);
@@ -355,9 +455,29 @@ internal sealed partial class RemoteServer
         SendBytes(context, status, contentType, body is null ? null : Encoding.UTF8.GetBytes(body));
 
     /// <summary>
-    /// As above, for the things that aren't text — the icons. Named rather than overloaded
-    /// so that `Send(context, status, null, null)`, which is how a 204 is sent, still says
-    /// one thing.
+    /// One tile's picture. Nothing here reads the disk: the set was read when the panel
+    /// was drawn and published with it, so a hash that no tile names is a 404 and a hash
+    /// that one does can only be a file some tile asked for by name. That is what makes an
+    /// arbitrary string in this URL safe — it is a key into a table, never a path — and it
+    /// is why the answer says "not on the panel" rather than "no such file", which would
+    /// be a way to ask this machine what it has.
+    /// </summary>
+    private void SendIcon(HttpListenerContext context, string hash)
+    {
+        if (Picture(hash) is not { } picture)
+        {
+            Send(context, HttpStatusCode.NotFound, "text/plain; charset=utf-8",
+                 "no picture by that name is on the panel");
+            return;
+        }
+
+        SendBytes(context, HttpStatusCode.OK, picture.ContentType, picture.Bytes);
+    }
+
+    /// <summary>
+    /// As above, for the things that aren't text — the app's own icons, and the pictures
+    /// on the tiles. Named rather than overloaded so that `Send(context, status, null,
+    /// null)`, which is how a 204 is sent, still says one thing.
     /// </summary>
     private static void SendBytes(HttpListenerContext context, HttpStatusCode status,
                                   string? contentType, byte[]? body)
@@ -386,9 +506,14 @@ internal sealed partial class RemoteServer
         // through textContent or a style property — so there is no sink for the directive
         // to protect. It's here for what it does allow to be locked down, not as a claim
         // to have shut inline script out.
+        //
+        // blob: on img-src is the tile pictures. They're behind the token like everything
+        // else, and an <img src> can't be made to send a header of ours, so the page
+        // fetches them itself and draws them from object URLs — data the page already
+        // holds, given a name it can put in an attribute.
         response.Headers["Content-Security-Policy"] =
             "default-src 'self'; script-src 'self' 'unsafe-inline'; "
-            + "style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; "
+            + "style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; "
             + "media-src 'self' blob:; frame-ancestors 'none'; base-uri 'none'; "
             + "form-action 'none'";
         response.Headers["X-Frame-Options"] = "DENY";

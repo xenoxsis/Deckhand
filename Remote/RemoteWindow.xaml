@@ -1,13 +1,14 @@
 <!--
-    Remote mode's only window. Deliberately ordinary — movable, resizable, in the
-    taskbar — because it isn't the control surface; the tablet is. All it has to do is
-    say where to reach the panel and whether the tablet is getting through.
+    What remote mode puts on this machine. Deliberately ordinary — movable, resizable, in
+    the taskbar — because it isn't the control surface; the tablet is. All it has to do is
+    say where to reach the panel, whether the tablet is getting through, and be the way to
+    the designer while the panel it would be designing isn't on any screen.
 
     ✕ is the exception to ordinary: it hides this window to the notification area rather
-    than closing it, where the same status is in the tooltip and ↻ and Quit are behind a
-    right-click. The panel goes on serving the tablet either way, so stopping it is Quit's
-    job, not the job of the button that puts a window away. See the tray section of
-    RemoteWindow.xaml.cs.
+    than closing it, where the same status is in the tooltip and the same buttons are
+    behind a right-click. The panel goes on serving the tablet either way, so stopping it
+    is Quit's job, not the job of the button that puts a window away. See the tray section
+    of RemoteWindow.xaml.cs.
 
     ShowActivated is false so appearing doesn't steal focus from whatever was being
     worked in: while this window has focus the dashboard refuses taps (a snippet would
@@ -148,6 +149,15 @@
 
             <TextBlock x:Name="DetailText" Foreground="#8A8A8A" FontSize="12"
                        TextWrapping="Wrap" Margin="17,4,0,0"/>
+
+            <!-- How big the other end turned out to be. This is the one thing about the
+                 tablet that can't be worked out from here — the panel is laid out for a
+                 screen nobody at this end can see — so the page measures it and says so,
+                 and it stays on screen because it's the number the designer wants typed
+                 into it. Hidden until a page has said; an older one never does. -->
+            <TextBlock x:Name="TabletText" Foreground="#B6B6BC" FontSize="12"
+                       TextWrapping="Wrap" Margin="17,4,0,0" Visibility="Collapsed"
+                       ToolTip="Measured on the tablet and sent with every request. Put the tiles size into the designer's screen size to see the layout at the size the tablet draws it."/>
             <TextBlock x:Name="WarningText" Foreground="#F0D68A" FontSize="12"
                        TextWrapping="Wrap" Margin="17,6,0,0" Visibility="Collapsed"/>
         </StackPanel>
@@ -181,17 +191,26 @@
             </Border>
         </Grid>
 
-        <Grid Grid.Row="4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <TextBlock Grid.Column="0" Foreground="#6A6A70" FontSize="11" TextWrapping="Wrap"
-                       VerticalAlignment="Center" Margin="0,0,10,0"
+        <!--
+            The footer sentence and the four things there are to do here, stacked rather
+            than side by side: with the buttons taking their width out of the same row,
+            the sentence was left a column too narrow to read. The buttons are in a
+            WrapPanel so that dragging the window down to MinWidth folds them onto a
+            second line instead of clipping the last one off.
+        -->
+        <StackPanel Grid.Row="4">
+            <TextBlock Foreground="#6A6A70" FontSize="11" TextWrapping="Wrap"
+                       Margin="0,0,4,4"
                        Text="The panel isn't drawn here. It still follows whichever app you focus, and a tap on the tablet acts on this machine."/>
 
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <WrapPanel HorizontalAlignment="Right">
+                <!-- The designer, from the window that is actually on screen in this mode.
+                     Building the layout with the tablet connected is the point of reaching
+                     it from here: a save arrives as an ordinary reload, so the tiles being
+                     arranged appear on the tablet as they're arranged. -->
+                <Button Content="Design" Style="{StaticResource TileButton}"
+                        ToolTip="Build the layout in a window here. Saving reloads the panel, so the tablet redraws — without unpairing it."
+                        MinWidth="86" MinHeight="42" FontSize="14" Click="Design_Click"/>
                 <!-- The half of ↻ people actually reach for when swapping tablets: let
                      the session go without also re-reading the config. -->
                 <Button Content="Unpair" Style="{StaticResource TileButton}"
@@ -204,8 +223,8 @@
                 <Button Content="Quit" Style="{StaticResource TileButton}"
                         ToolTip="Stop the dashboard. ✕ only hides this window."
                         MinWidth="86" MinHeight="42" FontSize="14" Click="Quit_Click"/>
-            </StackPanel>
-        </Grid>
+            </WrapPanel>
+        </StackPanel>
 
     </Grid>
 </Window>

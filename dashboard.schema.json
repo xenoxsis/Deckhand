@@ -234,7 +234,9 @@
           "default": 1,
           "description": "How many of the section's tile columns this tile occupies."
         },
-        "color": { "$ref": "#/definitions/tileColor" }
+        "color": { "$ref": "#/definitions/tileColor" },
+        "icon": { "$ref": "#/definitions/tileIcon" },
+        "iconMode": { "$ref": "#/definitions/tileIconMode" }
       }
     },
 
@@ -260,7 +262,9 @@
           "default": 1,
           "description": "How many of the section's tile columns this tile occupies."
         },
-        "color": { "$ref": "#/definitions/tileColor" }
+        "color": { "$ref": "#/definitions/tileColor" },
+        "icon": { "$ref": "#/definitions/tileIcon" },
+        "iconMode": { "$ref": "#/definitions/tileIconMode" }
       }
     },
 
@@ -268,6 +272,17 @@
       "type": "string",
       "pattern": "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
       "description": "Accent for the tile's outline, on the panel and the tablet alike: #RGB or #RRGGBB — the two forms WPF and a browser agree about."
+    },
+
+    "tileIcon": {
+      "type": "string",
+      "description": "A picture for the tile: the path to a png, jpg, gif, bmp, ico, webp or svg file — the types the panel and the tablet can both draw. An svg must be self-contained: one pointing at another file, declaring entities or carrying script is refused at load. webp is the one whose decoder Windows keeps optional, so a machine without the Web Media Extensions component draws the label instead. Absolute, or relative to this file's own folder, with %ENVVARS% expanded. Nothing is extracted or fetched: the tile draws the file named here and no other."
+    },
+
+    "tileIconMode": {
+      "enum": [ "left", "above", "fill" ],
+      "default": "left",
+      "description": "Where the picture goes: \"left\" of the label; \"above\" it, the picture taking the tile with the label underneath; or \"fill\", the tile being the picture with the label kept as its tooltip. An app tile's + is never a picture whichever this is."
     }
   }
 }

@@ -6,6 +6,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Windows.Threading;
 
 namespace Deckhand;
@@ -69,6 +70,10 @@ internal sealed partial class RemoteServer : IDisposable
     private const string TokenHeader = "X-Dashboard-Token";
     private const string ScreenHeader = "X-Dashboard-Screen";
 
+    /// <summary>How much screen the page has to draw in, which is the one thing about
+    /// the tablet this end can only be told. See <see cref="TabletScreen"/>.</summary>
+    private const string ViewportHeader = "X-Dashboard-Viewport";
+
     /// <summary>
     /// The page's own id for the device it's running on — a random value it makes once
     /// and keeps in its storage. This is what the session is pinned to; see
@@ -130,6 +135,31 @@ internal sealed partial class RemoteServer : IDisposable
     private volatile string _snapshot =
         "{\"revision\":0,\"context\":\"\",\"ready\":false,\"columns\":1,\"rows\":1,\"groups\":[]}";
     private int _revision;
+
+    /// <summary>Where a tile's picture is fetched from, with the hash of its bytes on the
+    /// end. Named here so the page and the route can't drift apart.</summary>
+    public const string IconPath = "/api/icon/";
+
+    private static readonly IReadOnlyDictionary<string, TileImages.Picture> NoPictures =
+        new Dictionary<string, TileImages.Picture>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The pictures the current snapshot's tiles name, and the ones the snapshot before it
+    /// named. Two sets, because a page can ask for a picture a moment after the panel
+    /// stopped drawing it — the tiles it is asking about are the ones it drew, not the
+    /// ones just published — and a turn of grace costs a dictionary of byte arrays that
+    /// were in memory anyway.
+    ///
+    /// This is also the whole of what a request can reach. A picture is asked for by the
+    /// hash of its own content, and answered only if a tile currently names it, so the
+    /// arbitrary string in that URL is a key into this table and never a path.
+    /// </summary>
+    private volatile IReadOnlyDictionary<string, TileImages.Picture> _pictures = NoPictures;
+    private volatile IReadOnlyDictionary<string, TileImages.Picture> _picturesBefore = NoPictures;
+
+    /// <summary>The bytes behind a hash the panel published, or null for anything else.</summary>
+    private TileImages.Picture? Picture(string hash) =>
+        _pictures.GetValueOrDefault(hash) ?? _picturesBefore.GetValueOrDefault(hash);
 
     // Set from the listener thread, read from the UI thread by the status window: in
     // remote mode nothing is on screen here, so "is the tablet actually talking to me"
@@ -216,6 +246,15 @@ internal sealed partial class RemoteServer : IDisposable
     /// </summary>
     private volatile string? _screen;
 
+    /// <summary>
+    /// How big the tablet's screen turned out to be, as the page measures it and reports
+    /// on every request. Nothing on this end can work that out — the panel is being laid
+    /// out for a screen nobody here can see — so it's asked for and shown, and put in the
+    /// log when it changes. A whole reference is swapped at once, so a reader never gets a
+    /// width from one measurement and a height from the next.
+    /// </summary>
+    private volatile TabletScreen? _tablet;
+
     private RemoteServer(HttpListener listener, string token,
                          IReadOnlyList<string> allowedHosts, Dispatcher dispatcher,
                          Func<string, TapResult> onTap, Assets assets, ActivityLog log)
@@ -294,10 +333,18 @@ internal sealed partial class RemoteServer : IDisposable
     /// remote view follows the focused app the same way the panel does.
     /// </summary>
     public void Publish(string context, bool ready, int columns, int rows,
-                        IReadOnlyList<RemoteGroup> groups, RemoteOverlay? overlay)
+                        IReadOnlyList<RemoteGroup> groups, RemoteOverlay? overlay,
+                        IReadOnlyDictionary<string, TileImages.Picture> pictures)
     {
         var snapshot = new RemoteSnapshot(++_revision, context, ready, columns, rows,
                                           groups, _pageBuild, overlay);
+
+        // The pictures go in before the snapshot that names them, so a page reading the
+        // new tiles can't ask for one of their pictures a moment too early. The set they
+        // replace stays answerable — see _picturesBefore.
+        _picturesBefore = _pictures;
+        _pictures = pictures;
+
         _snapshot = JsonSerializer.Serialize(snapshot, JsonOptions);
 
         // Wake every parked tiles request. The fresh source goes in before the old one
@@ -350,7 +397,8 @@ internal sealed partial class RemoteServer : IDisposable
     /// Who has been talking to us and when, counted only for requests that got past the
     /// token — so a port scanner doesn't show up as "the tablet connected".
     /// </summary>
-    public (DateTime? LastSeenUtc, string? Peer, int Taps, string? Screen) Activity
+    public (DateTime? LastSeenUtc, string? Peer, int Taps, string? Screen,
+            TabletScreen? Tablet) Activity
     {
         get
         {
@@ -359,12 +407,12 @@ internal sealed partial class RemoteServer : IDisposable
             // reporting the silence would flip the status dot on every quiet stretch.
             if (Volatile.Read(ref _parked) > 0)
             {
-                return (DateTime.UtcNow, _peer, Volatile.Read(ref _taps), _screen);
+                return (DateTime.UtcNow, _peer, Volatile.Read(ref _taps), _screen, _tablet);
             }
 
             long ticks = Interlocked.Read(ref _lastSeenTicks);
             return (ticks == 0 ? null : new DateTime(ticks, DateTimeKind.Utc),
-                    _peer, Volatile.Read(ref _taps), _screen);
+                    _peer, Volatile.Read(ref _taps), _screen, _tablet);
         }
     }
 
@@ -451,5 +499,10 @@ internal sealed partial class RemoteServer : IDisposable
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+
+        // So an iconMode crosses as "left", "above" or "fill" — the same words the config
+        // spells it with — instead of as 0, 1 or 2, which the page would then have to know
+        // the order of this enum to read.
+        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 }
