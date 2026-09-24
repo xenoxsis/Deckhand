@@ -48,3 +48,15 @@ packages/
 # Publish output.
 publish/
 *.publishsettings
+
+# The publish profile is one machine's answer to "where does the folder go" — an
+# output path, a runtime identifier and a choice about self-containment. It lives
+# under Properties/ because that is where Visual Studio writes it, and it is
+# per-machine in the same way the config is.
+Properties/PublishProfiles/
+
+# Pictures the designer copies in beside the config when a tile is given one. They
+# are whatever art the tile points at — usually someone else's logo, which is
+# theirs and not this repository's to carry — and, like the config that names them,
+# they are this machine's set rather than the project's.
+pictures/

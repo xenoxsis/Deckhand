@@ -4,35 +4,36 @@
 -->
 <Application x:Class="Deckhand.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:Deckhand">
     <Application.Resources>
 
         <!-- Touch-friendly button: big hit target, never focusable -->
         <Style x:Key="TileButton" TargetType="Button">
             <Setter Property="Focusable" Value="False"/>
-            <Setter Property="MinHeight" Value="56"/>
+            <Setter Property="MinHeight" Value="{x:Static local:TileMetrics.MinHeight}"/>
             <Setter Property="MinWidth" Value="160"/>
-            <Setter Property="Margin" Value="4"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Foreground" Value="#EAEAEA"/>
-            <Setter Property="Background" Value="#2D2D30"/>
-            <Setter Property="BorderBrush" Value="#3F3F46"/>
+            <Setter Property="Margin" Value="{x:Static local:TileMetrics.TileMargin}"/>
+            <Setter Property="FontSize" Value="{x:Static local:TileMetrics.FontSize}"/>
+            <Setter Property="Foreground" Value="{x:Static local:TileMetrics.Text}"/>
+            <Setter Property="Background" Value="{x:Static local:TileMetrics.Tile}"/>
+            <Setter Property="BorderBrush" Value="{x:Static local:TileMetrics.Line}"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1" CornerRadius="8">
+                                BorderThickness="{x:Static local:TileMetrics.Border}" CornerRadius="{x:Static local:TileMetrics.Corner}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="12,8"/>
+                                              Margin="{x:Static local:TileMetrics.LabelPadding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#007ACC"/>
+                                <Setter TargetName="bd" Property="Background" Value="{x:Static local:TileMetrics.Accent}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#007ACC"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{x:Static local:TileMetrics.Accent}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -51,23 +52,23 @@
             reach them. Everything else is TileButton's.
         -->
         <Style x:Key="SplitTileLeft" TargetType="Button" BasedOn="{StaticResource TileButton}">
-            <Setter Property="Margin" Value="4,4,0,4"/>
+            <Setter Property="Margin" Value="{x:Static local:TileMetrics.SplitLeftMargin}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <!-- The right border is the divider line for the whole pair. -->
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1" CornerRadius="8,0,0,8">
+                                BorderThickness="{x:Static local:TileMetrics.Border}" CornerRadius="{x:Static local:TileMetrics.SplitLeftCorner}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="12,8"/>
+                                              Margin="{x:Static local:TileMetrics.LabelPadding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#007ACC"/>
+                                <Setter TargetName="bd" Property="Background" Value="{x:Static local:TileMetrics.Accent}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="BorderBrush" Value="#007ACC"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{x:Static local:TileMetrics.Accent}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -76,7 +77,7 @@
         </Style>
 
         <Style x:Key="SplitTileRight" TargetType="Button" BasedOn="{StaticResource TileButton}">
-            <Setter Property="Margin" Value="0,4,4,4"/>
+            <Setter Property="Margin" Value="{x:Static local:TileMetrics.SplitRightMargin}"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -84,13 +85,13 @@
                         <!-- No left border: the half on the left already drew it. -->
                         <Border x:Name="bd" Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="0,1,1,1" CornerRadius="0,8,8,0">
+                                BorderThickness="{x:Static local:TileMetrics.SplitRightBorder}" CornerRadius="{x:Static local:TileMetrics.SplitRightCorner}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Margin="0,8"/>
+                                              Margin="{x:Static local:TileMetrics.NarrowLabelPadding}"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="#007ACC"/>
+                                <Setter TargetName="bd" Property="Background" Value="{x:Static local:TileMetrics.Accent}"/>
                             </Trigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="#3A3A3E"/>
@@ -112,7 +113,7 @@
         </Style>
 
         <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="#8A8A8A"/>
+            <Setter Property="Foreground" Value="{x:Static local:TileMetrics.Dim}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Margin" Value="8,4,8,4"/>
@@ -121,11 +122,11 @@
 
         <!-- The box around one section, so its slice of the grid is visible -->
         <Style x:Key="SectionGroup" TargetType="Border">
-            <Setter Property="Background" Value="#252526"/>
-            <Setter Property="BorderBrush" Value="#3F3F46"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Margin" Value="4"/>
+            <Setter Property="Background" Value="{x:Static local:TileMetrics.Group}"/>
+            <Setter Property="BorderBrush" Value="{x:Static local:TileMetrics.Line}"/>
+            <Setter Property="BorderThickness" Value="{x:Static local:TileMetrics.Border}"/>
+            <Setter Property="CornerRadius" Value="{x:Static local:TileMetrics.GroupCorner}"/>
+            <Setter Property="Margin" Value="{x:Static local:TileMetrics.TileMargin}"/>
             <Setter Property="Padding" Value="2,2,2,4"/>
         </Style>
 
@@ -142,11 +143,11 @@
             menus actually use: one line of content, no submenus, no icons.
         -->
         <Style x:Key="DarkMenu" TargetType="ContextMenu">
-            <Setter Property="Background" Value="#252526"/>
-            <Setter Property="BorderBrush" Value="#3F3F46"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="{x:Static local:TileMetrics.Group}"/>
+            <Setter Property="BorderBrush" Value="{x:Static local:TileMetrics.Line}"/>
+            <Setter Property="BorderThickness" Value="{x:Static local:TileMetrics.Border}"/>
             <Setter Property="Padding" Value="0,5"/>
-            <Setter Property="Foreground" Value="#EAEAEA"/>
+            <Setter Property="Foreground" Value="{x:Static local:TileMetrics.Text}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ContextMenu">
@@ -163,7 +164,7 @@
         </Style>
 
         <Style x:Key="DarkMenuItem" TargetType="MenuItem">
-            <Setter Property="Foreground" Value="#EAEAEA"/>
+            <Setter Property="Foreground" Value="{x:Static local:TileMetrics.Text}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="14,7"/>
             <Setter Property="Template">
@@ -189,7 +190,7 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Separator">
-                        <Border Height="1" Background="#3F3F46" Margin="0,5"/>
+                        <Border Height="1" Background="{x:Static local:TileMetrics.Line}" Margin="0,5"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -204,7 +205,7 @@
         <Style TargetType="ScrollBar">
             <Setter Property="Width" Value="14"/>
             <Setter Property="MinWidth" Value="14"/>
-            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Background" Value="{x:Static local:TileMetrics.Background}"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template">
                 <Setter.Value>

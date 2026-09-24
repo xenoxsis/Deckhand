@@ -11,6 +11,7 @@
 <Window x:Class="Deckhand.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Deckhand"
         Title="Deckhand"
         Width="880" Height="620" MinWidth="320" MinHeight="240"
         WindowStyle="None" ResizeMode="NoResize"
@@ -20,7 +21,7 @@
         ShowInTaskbar="False"
         WindowStartupLocation="Manual">
 
-    <Border x:Name="RootBorder" Background="#1E1E1E" BorderBrush="#3F3F46"
+    <Border x:Name="RootBorder" Background="{x:Static local:TileMetrics.Background}" BorderBrush="{x:Static local:TileMetrics.Line}"
             BorderThickness="1" CornerRadius="12">
       <Grid>
         <DockPanel Margin="8">
@@ -101,7 +102,7 @@
         -->
         <Grid x:Name="OverlayRoot" Visibility="Collapsed" Background="#D8141416"
               MouseLeftButtonDown="OverlayBackdrop_MouseLeftButtonDown">
-            <Border Background="#252526" BorderBrush="#3F3F46" BorderThickness="1"
+            <Border Background="{x:Static local:TileMetrics.Group}" BorderBrush="{x:Static local:TileMetrics.Line}" BorderThickness="1"
                     CornerRadius="12" Margin="16" Padding="6"
                     MaxWidth="560" MaxHeight="520"
                     HorizontalAlignment="Center" VerticalAlignment="Center"

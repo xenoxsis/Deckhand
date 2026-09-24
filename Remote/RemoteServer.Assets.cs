@@ -41,7 +41,7 @@ internal sealed partial class RemoteServer
     /// </summary>
     private static Assets LoadAssets()
     {
-        byte[]? page = Embedded("Deckhand.remote.html");
+        byte[]? page = Styled(Embedded("Deckhand.remote.html"));
 
         var files = new Dictionary<string, StaticFile>(StringComparer.Ordinal);
         foreach (var (path, resource, type) in Served)
@@ -69,6 +69,25 @@ internal sealed partial class RemoteServer
                 ? "<!doctype html><p>remote.html is missing from the build."
                 : Encoding.UTF8.GetString(page),
             files, build);
+    }
+
+    /// <summary>
+    /// The page with the tile measurements dropped into its :root block, so the browser
+    /// lays a tile out with the same numbers the panel's own styles are built from — see
+    /// <see cref="TileMetrics"/>, which is the one copy of them.
+    ///
+    /// Done here, before the fingerprint, rather than on the way out: the values are part
+    /// of what's served, so changing one has to count as a new build. Otherwise the file
+    /// on disk would be unchanged, the fingerprint with it, and a page already open on the
+    /// tablet would go on drawing yesterday's tiles.
+    /// </summary>
+    private static byte[]? Styled(byte[]? page)
+    {
+        if (page is null) return null;
+
+        string html = Encoding.UTF8.GetString(page)
+                              .Replace("__TILES__", TileMetrics.Css(), StringComparison.Ordinal);
+        return Encoding.UTF8.GetBytes(html);
     }
 
     /// <summary>
