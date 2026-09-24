@@ -45,24 +45,24 @@ internal static class TileFaces
 
         if (image is null) return text;
 
-        if (mode is IconMode.Fill) return Picture(image, 88, 480);
+        if (mode is IconMode.Fill) return Picture(image, TileMetrics.IconFillHeight, TileMetrics.PictureMaxWidth);
 
         var dock = new DockPanel { LastChildFill = true };
 
         if (mode is IconMode.Above)
         {
-            text.Margin = new Thickness(0, 6, 0, 0);
+            text.Margin = new Thickness(0, TileMetrics.IconStackGap, 0, 0);
             DockPanel.SetDock(text, Dock.Bottom);
             dock.Children.Add(text);
-            dock.Children.Add(Picture(image, 64, 480));
+            dock.Children.Add(Picture(image, TileMetrics.IconAboveHeight, TileMetrics.PictureMaxWidth));
             return dock;
         }
 
         // Beside the label: the picture at about text height, so it can't decide how tall
         // a row of buttons is, and no wider than the + on an app tile, so a banner used as
         // an icon can't push the label it belongs to out of the cell.
-        var icon = Picture(image, 22, 44);
-        icon.Margin = new Thickness(0, 0, 8, 0);
+        var icon = Picture(image, TileMetrics.IconLeftHeight, TileMetrics.IconLeftWidth);
+        icon.Margin = new Thickness(0, 0, TileMetrics.IconGap, 0);
         DockPanel.SetDock(icon, Dock.Left);
         dock.Children.Add(icon);
 
